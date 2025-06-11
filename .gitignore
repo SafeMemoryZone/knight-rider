@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# Output folders
+build/
+out/
+
+# Caches
+.DS_STORE
+.cache/
+compile_commands.json
