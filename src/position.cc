@@ -6,8 +6,16 @@
 #include <stdexcept>
 #include <string>
 
+#include "movegen.hpp"
+
 Position::Position()
-    : occ(0), epSq(0), usColor(0), castlingRights(0b1111), rule50(0), fullMoveCount(1) {
+    : occ(0),
+      epSq(0),
+      usColor(0),
+      oppColor(1),
+      castlingRights(0b1111),
+      rule50(0),
+      fullMoveCount(1) {
 	pieces[PT_PAWN] = 0x000000000000FF00ULL;
 	pieces[PT_KNIGHT] = 0x0000000000000042ULL;
 	pieces[PT_BISHOP] = 0x0000000000000024ULL;
@@ -88,9 +96,11 @@ Position::Position(const std::string &fen)
 	// active color
 	if (activeColorStr == "w") {
 		usColor = 0;
+		oppColor = 1;
 	}
 	else if (activeColorStr == "b") {
 		usColor = 1;
+		oppColor = 0;
 	}
 	else {
 		throw std::runtime_error("Invalid FEN: invalid active color");

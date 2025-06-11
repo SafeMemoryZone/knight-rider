@@ -1,1 +1,5 @@
-int main(void) {}
+#include "movegen.hpp"
+
+int main(void) {
+    MoveList moveList;
+}
