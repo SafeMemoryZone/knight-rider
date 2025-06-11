@@ -160,11 +160,11 @@ std::string Position::toFen(void) const {
 	// piece placement
 	for (int rank = 7; rank >= 0; --rank) {
 		int runningEmptyCount = 0;
-		for (int file = 0; file < 8; ++file) {
+		for (int file = 0; file < 8; file++) {
 			uint64_t pieceBb = 1ULL << (rank * 8 + file);
 			bool found = false;
 
-			for (int pieceIdx = 0; pieceIdx < 12; ++pieceIdx) {
+			for (int pieceIdx = 0; pieceIdx < 12; pieceIdx++) {
 				if (pieces[pieceIdx] & pieceBb) {
 					if (runningEmptyCount) {
 						stream << runningEmptyCount;
@@ -176,7 +176,7 @@ std::string Position::toFen(void) const {
 				}
 			}
 			if (!found) {
-				++runningEmptyCount;
+				runningEmptyCount++;
 			}
 		}
 		if (runningEmptyCount) {
