@@ -27,7 +27,7 @@ MoveGenerator::MoveGenerator(Position &position) : position(position) {}
 MoveList MoveGenerator::generateLegalMoves(void) const {
 	MoveList moveList;
 
-	int kingSq = std::countl_zero(position.pieces[position.usColor * 6 + PT_KING]);
+	int kingSq = std::countr_zero(position.pieces[position.usColor * 6 + PT_KING]);
 	assert(kingSq < 64);
 
 	Bitboard occ = position.occForColor[0] | position.occForColor[1];
@@ -258,7 +258,7 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 		addMovesToList(moveList, kingMoves, position.pieces[position.usColor * 6 + PT_KING],
 		               PT_KING);
 
-        // TODO: castling
+		// TODO: castling
 	}
 
 	return moveList;
