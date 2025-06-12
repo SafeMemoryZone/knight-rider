@@ -9,7 +9,7 @@
 #include "movegen.hpp"
 
 Position::Position()
-    : occ(0),
+    : occForColor{},
       epSq(0),
       usColor(0),
       oppColor(1),
@@ -29,13 +29,15 @@ Position::Position()
 	pieces[PT_QUEEN + 6] = 0x0800000000000000ULL;
 	pieces[PT_KING + 6] = 0x1000000000000000ULL;
 
-	for (int pieceIdx = 0; pieceIdx < 12; pieceIdx++) {
-		occ |= pieces[pieceIdx];
+	for (int color = 0; color < 2; color++) {
+		for (int pt = 0; pt < 6; pt++) {
+			occForColor[color] |= pieces[color * 6 + pt];
+		}
 	}
 }
 
 Position::Position(const std::string &fen)
-    : pieces{}, epSq(0), usColor(0), castlingRights(0), rule50(0), fullMoveCount(0) {
+    : occForColor{}, pieces{}, epSq(0), usColor(0), castlingRights(0), rule50(0), fullMoveCount(0) {
 	std::istringstream stream(fen);
 
 	std::string piecePlacement;
@@ -89,8 +91,10 @@ Position::Position(const std::string &fen)
 	}
 
 	// update occupancy
-	for (int pieceIdx = 0; pieceIdx < 12; pieceIdx++) {
-		occ |= pieces[pieceIdx];
+	for (int color = 0; color < 2; color++) {
+		for (int pt = 0; pt < 6; pt++) {
+			occForColor[color] |= pieces[color * 6 + pt];
+		}
 	}
 
 	// active color

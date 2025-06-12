@@ -69,9 +69,10 @@ class MoveGenerator {
 	MoveList generateLegalMoves(void) const;
 
    private:
-	Bitboard computeAttackMask(void) const;
-    Bitboard computeCheckerMask(int kingSq) const;
-    Bitboard computePinMask(int kingSq, Bitboard friendlyOcc) const;
+	Bitboard computeAttackMask(Bitboard occ) const;
+    Bitboard computeCheckerMask(int kingSq, Bitboard occ) const;
+    Bitboard computePinMask(int kingSq, Bitboard occ) const;
+    bool isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) const;
 
 	Position& position;
 };

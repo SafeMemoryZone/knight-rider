@@ -11,7 +11,7 @@ struct Position {
 
 	std::string toFen(void) const;
 
-	Bitboard occ;
+	Bitboard occForColor[2];
 	Bitboard pieces[12];
 	Bitboard epSq;
 	int usColor;  // 0 for white, 1 for black
