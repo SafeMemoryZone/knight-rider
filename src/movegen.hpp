@@ -18,6 +18,7 @@ class Move {
 	Move() = default;
 	Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
 
+	inline std::string toLan(void) const;
 	inline Bitboard getFrom() const;
 	inline Bitboard getTo() const;
 	inline int getMovingPt() const;
@@ -28,6 +29,31 @@ class Move {
    private:
 	uint32_t move;
 };
+
+inline std::string Move::toLan() const {
+	int fromSq = move & 0x3F;
+	int toSq = (move >> 6) & 0x3F;
+	int promoPt = (move >> 15) & 0x7;
+
+	char fromFile = char('a' + (fromSq & 7));
+	char fromRank = char('1' + (fromSq >> 3));
+	char toFile = char('a' + (toSq & 7));
+	char toRank = char('1' + (toSq >> 3));
+
+	std::string s;
+	s.reserve(5);
+	s.push_back(fromFile);
+	s.push_back(fromRank);
+	s.push_back(toFile);
+	s.push_back(toRank);
+
+	if (promoPt != PT_NULL) {
+		static constexpr char promoChar[7] = {0, 'n', 'b', 'r', 'q', 0, 0};
+		s.push_back(promoChar[promoPt]);
+	}
+
+	return s;
+}
 
 inline Bitboard Move::getFrom() const { return 1ULL << (move & 0x3F); }
 
@@ -44,14 +70,16 @@ inline bool Move::getIsEp() const { return (move >> 19) & 1; }
 class MoveList {
    public:
 	MoveList() : movesCount(0) {}
-	inline void add(Move move);
 
+	inline int getMovesCount(void);
+	inline void add(Move move);
 	Move* begin() { return moves; }
 	Move* end() { return moves + movesCount; }
 	const Move* begin() const { return moves; }
 	const Move* end() const { return moves + movesCount; }
 	const Move* cbegin() const { return moves; }
 	const Move* cend() const { return moves + movesCount; }
+	const Move& operator[](size_t index) const { return moves[index]; }
 
    private:
 	static constexpr int MAX_MOVES = 256;
@@ -62,19 +90,22 @@ class MoveList {
 
 inline void MoveList::add(Move move) { moves[movesCount++] = move; }
 
+inline int MoveList::getMovesCount(void) { return movesCount; }
+
 class MoveGenerator {
    public:
-	MoveGenerator(Position& position);
+	MoveGenerator() = default;
+	MoveGenerator(Position* position);
 
 	MoveList generateLegalMoves(void) const;
 
    private:
 	Bitboard computeAttackMask(Bitboard occ) const;
-    Bitboard computeCheckerMask(int kingSq, Bitboard occ) const;
-    Bitboard computePinMask(int kingSq, Bitboard occ) const;
-    bool isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) const;
+	Bitboard computeCheckerMask(int kingSq, Bitboard occ) const;
+	Bitboard computePinMask(int kingSq, Bitboard occ) const;
+	bool isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) const;
 
-	Position& position;
+	Position* position;
 };
 
 #endif  // MOVEGEN_HPP
