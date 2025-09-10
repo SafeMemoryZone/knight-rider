@@ -69,7 +69,7 @@ inline bool Move::getIsEp() const { return (move >> 19) & 1; }
 
 class MoveList {
    public:
-	MoveList() : movesCount(0) {}
+	MoveList() = default;
 
 	inline int getMovesCount(void);
 	inline void add(Move move);
@@ -85,7 +85,7 @@ class MoveList {
 	static constexpr int MAX_MOVES = 256;
 
 	Move moves[MAX_MOVES];
-	int movesCount;
+	int movesCount = 0;
 };
 
 inline void MoveList::add(Move move) { moves[movesCount++] = move; }
@@ -100,12 +100,19 @@ class MoveGenerator {
 	MoveList generateLegalMoves(void) const;
 
    private:
-	Bitboard computeAttackMask(Bitboard occ) const;
-	Bitboard computeCheckerMask(int kingSq, Bitboard occ) const;
-	Bitboard computePinMask(int kingSq, Bitboard occ) const;
-	bool isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) const;
+	template <int UsColor>
+	MoveList generateLegalMovesT(void) const;
+	template <int UsColor>
+	Bitboard computeAttackMaskT(void) const;
+	template <int UsColor>
+	Bitboard computeCheckerMaskT(void) const;
+	template <int UsColor>
+	Bitboard computePinMaskT(void) const;
+	template <int UsColor>
+	bool isEpLegalT(Bitboard capturingPawn) const;
 
 	Position* position;
+	Bitboard* P;  // alias for position->pieces
 };
 
 #endif  // MOVEGEN_HPP

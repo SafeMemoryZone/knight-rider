@@ -22,6 +22,7 @@ struct Position {
 	bool operator==(const Position &other) const noexcept;
 
 	std::string toFen(void) const;
+
 	void makeMove(Move move);
 	void undoMove(void);
 
@@ -33,6 +34,12 @@ struct Position {
 	                         // black queen side
 	uint8_t usColor;         // 0 for white, 1 for black
 	uint8_t oppColor;
+
+   private:
+	template <int UsColor>
+	void makeMoveT(Move move);
+	template <int UsColor>
+	void undoMoveT(void);
 };
 
 static constexpr int MAX_PLY = 256;

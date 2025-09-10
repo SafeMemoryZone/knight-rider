@@ -25,70 +25,93 @@ static inline void addMovesToList(MoveList &moveList, Bitboard from, Bitboard al
 Move::Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp)
     : move(0) {
 	move |= std::countr_zero(from) & 0x3F;
-	move |= (uint32_t)(std::countr_zero(to) & 0x3F) << 6;
-	move |= (uint32_t)(movingPt & 7) << 12;
-	move |= (uint32_t)(promoPt & 7) << 15;
-	move |= (uint32_t)(isCastling & 1) << 18;
-	move |= (uint32_t)(isEp & 1) << 19;
+	move |= static_cast<uint32_t>(std::countr_zero(to) & 0x3F) << 6;
+	move |= static_cast<uint32_t>(movingPt & 7) << 12;
+	move |= static_cast<uint32_t>(promoPt & 7) << 15;
+	move |= static_cast<uint32_t>(isCastling & 1) << 18;
+	move |= static_cast<uint32_t>(isEp & 1) << 19;
 }
 
-MoveGenerator::MoveGenerator(Position *position) : position(position) {}
+MoveGenerator::MoveGenerator(Position *position) : position(position), P(position->pieces) {}
 
 MoveList MoveGenerator::generateLegalMoves(void) const {
+	return (position->usColor == WHITE) ? generateLegalMovesT<WHITE>()
+	                                    : generateLegalMovesT<BLACK>();
+}
+
+static Bitboard usOcc;
+static Bitboard oppOcc;
+static Bitboard occ;
+static Bitboard oppRooksQueens;
+static Bitboard oppBishopsQueens;
+static int kingSq;
+
+template <int UsColor>
+MoveList MoveGenerator::generateLegalMovesT(void) const {
+	constexpr int OppColor = UsColor ^ 1;
+
 	MoveList moveList;
 
-	int kingSq = std::countr_zero(position->pieces[position->usColor * 6 + PT_KING]);
+	// globals used in other functions
+
+	kingSq = std::countr_zero(P[UsColor * 6 + PT_KING]);
 	assert(kingSq < 64);
 
-	Bitboard occ = position->occForColor[WHITE] | position->occForColor[BLACK];
+	usOcc = position->occForColor[UsColor];
+	oppOcc = position->occForColor[OppColor];
+	occ = position->occForColor[WHITE] | position->occForColor[BLACK];
+	oppRooksQueens = P[OppColor * 6 + PT_ROOK] | P[OppColor * 6 + PT_QUEEN];
+	oppBishopsQueens = P[OppColor * 6 + PT_BISHOP] | P[OppColor * 6 + PT_QUEEN];
 
-	Bitboard attackMask = computeAttackMask(occ);
-	Bitboard checkerMask = computeCheckerMask(kingSq, occ);
-	bool isInCheck = std::popcount(checkerMask) >= 1;
-	bool isInDoubleCheck = std::popcount(checkerMask) == 2;
+	// locals
+
+	const Bitboard attackMask = computeAttackMaskT<UsColor>();
+	const Bitboard checkerMask = computeCheckerMaskT<UsColor>();
+	const int checkCount = std::popcount(checkerMask);
+	const bool isInCheck = checkCount != 0;
+	const bool isInDoubleCheck = checkCount > 1;
 	// if in normal check and the checking piece is a slider piece, generate the block mask
-	Bitboard checkBlockMask =
-	    isInCheck && !isInDoubleCheck &&
-	            (checkerMask & ~position->pieces[position->oppColor * 6 + PT_PAWN] &
-	             ~position->pieces[position->oppColor * 6 + PT_KNIGHT])
-	        ? BETWEEN_MASK[kingSq][std::countr_zero(checkerMask)]
-	        : 0ULL;
-	Bitboard checkEvasionMask = checkerMask | checkBlockMask;
-	Bitboard pinMask = computePinMask(kingSq, occ);
+	const Bitboard sliderCheckers =
+	    checkerMask & ~(P[OppColor * 6 + PT_PAWN] | P[OppColor * 6 + PT_KNIGHT]);
+	const Bitboard checkBlockMask = (checkCount == 1 && sliderCheckers)
+	                                    ? BETWEEN_MASK[kingSq][std::countr_zero(sliderCheckers)]
+	                                    : 0ULL;
+	const Bitboard checkEvasionMask = isInCheck ? checkerMask | checkBlockMask : ~0ULL;
+	const Bitboard pinMask = computePinMaskT<UsColor>();
+	const Bitboard capturableSquares = ~usOcc;
 
-	Bitboard capturableSquares = ~position->occForColor[position->usColor];
+	// move generation start
+
 	if (!isInDoubleCheck) [[likely]] {
 		// pawns
 		Bitboard freeSquares = ~occ;
-		Bitboard pawns = position->pieces[position->usColor * 6 + PT_PAWN];
+		Bitboard pawns = P[UsColor * 6 + PT_PAWN];
+
 		while (pawns) {
 			Bitboard currPawn = pawns & -pawns;
 			int currPawnSq = std::countr_zero(currPawn);
 
-			if (position->usColor == WHITE) {
+			if constexpr (UsColor == WHITE) {
 				// we are white
 				// pushes
 				Bitboard singlePush = WHITE_PAWN_SINGLE_PUSH_MASK[currPawnSq] & freeSquares;
 				Bitboard doublePush = ((singlePush & RANK_3) << 8) & freeSquares;
 
 				// captures
-				Bitboard leftCapture = WHITE_PAWN_CAPTURE_LEFT_MASK[currPawnSq] &
-				                       position->occForColor[position->oppColor];
-				Bitboard rightCapture = WHITE_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] &
-				                        position->occForColor[position->oppColor];
+				Bitboard leftCapture = WHITE_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & oppOcc;
+				Bitboard rightCapture = WHITE_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] & oppOcc;
 
 				Bitboard normalMoves = singlePush | doublePush | leftCapture | rightCapture;
 
 				// en-passant
 				Bitboard ep =
-				    isEpLegal(kingSq, occ, currPawn)
+				    isEpLegalT<UsColor>(currPawn)
 				        ? (WHITE_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & position->epSquare) |
 				              (WHITE_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] & position->epSquare)
 				        : 0ULL;
 
+				normalMoves &= checkEvasionMask;
 				if (isInCheck) {
-					normalMoves &= checkEvasionMask;
-
 					// if en-passant does not resolve the check, disallow it
 					if ((ep >> 8) != checkEvasionMask) {
 						ep = 0ULL;
@@ -130,23 +153,20 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 				Bitboard doublePush = ((singlePush & RANK_6) >> 8) & freeSquares;
 
 				// captures
-				Bitboard leftCapture = BLACK_PAWN_CAPTURE_LEFT_MASK[currPawnSq] &
-				                       position->occForColor[position->oppColor];
-				Bitboard rightCapture = BLACK_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] &
-				                        position->occForColor[position->oppColor];
+				Bitboard leftCapture = BLACK_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & oppOcc;
+				Bitboard rightCapture = BLACK_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] & oppOcc;
 
 				Bitboard normalMoves = singlePush | doublePush | leftCapture | rightCapture;
 
 				// en-passant
 				Bitboard ep =
-				    isEpLegal(kingSq, occ, currPawn)
+				    isEpLegalT<UsColor>(currPawn)
 				        ? (BLACK_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & position->epSquare) |
 				              (BLACK_PAWN_CAPTURE_RIGHT_MASK[currPawnSq] & position->epSquare)
 				        : 0ULL;
 
+				normalMoves &= checkEvasionMask;
 				if (isInCheck) {
-					normalMoves &= checkEvasionMask;
-
 					// if en-passant does not resolve the check, disallow it
 					if ((ep << 8) != checkEvasionMask) {
 						ep = 0ULL;
@@ -186,18 +206,18 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 		}
 
 		// knights
-		Bitboard knights = position->pieces[position->usColor * 6 + PT_KNIGHT];
+		Bitboard knights = P[UsColor * 6 + PT_KNIGHT];
 		while (knights) {
 			Bitboard currKnight = knights & -knights;
-			Bitboard moves = KNIGHT_MOVE_MASK[std::countr_zero(currKnight)] & capturableSquares;
+			int currKnightSq = std::countr_zero(currKnight);
+
+			Bitboard moves = KNIGHT_MOVE_MASK[currKnightSq] & capturableSquares;
 
 			// checks & pins
-			if (isInCheck) {
-				moves &= checkEvasionMask;
-			}
+			moves &= checkEvasionMask;
 
 			if (currKnight & pinMask) {
-				moves &= LINE_MASK[std::countr_zero(currKnight)][kingSq];
+				moves &= LINE_MASK[currKnightSq][kingSq];
 			}
 
 			addMovesToList(moveList, currKnight, moves, PT_KNIGHT);
@@ -205,19 +225,17 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 		}
 
 		// bishops
-		Bitboard bishops = position->pieces[position->usColor * 6 + PT_BISHOP];
+		Bitboard bishops = P[UsColor * 6 + PT_BISHOP];
 		while (bishops) {
 			Bitboard currBishop = bishops & -bishops;
-			Bitboard moves =
-			    getBishopAttacks(std::countr_zero(currBishop), occ) & capturableSquares;
+			int currBishopSq = std::countr_zero(currBishop);
+			Bitboard moves = getBishopAttacks(currBishopSq, occ) & capturableSquares;
 
 			// checks & pins
-			if (isInCheck) {
-				moves &= checkEvasionMask;
-			}
+			moves &= checkEvasionMask;
 
 			if (currBishop & pinMask) {
-				moves &= LINE_MASK[std::countr_zero(currBishop)][kingSq];
+				moves &= LINE_MASK[currBishopSq][kingSq];
 			}
 
 			addMovesToList(moveList, currBishop, moves, PT_BISHOP);
@@ -225,18 +243,17 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 		}
 
 		// rooks
-		Bitboard rooks = position->pieces[position->usColor * 6 + PT_ROOK];
+		Bitboard rooks = P[UsColor * 6 + PT_ROOK];
 		while (rooks) {
 			Bitboard currRook = rooks & -rooks;
-			Bitboard moves = getRookAttacks(std::countr_zero(currRook), occ) & capturableSquares;
+			int currRookSq = std::countr_zero(currRook);
+			Bitboard moves = getRookAttacks(currRookSq, occ) & capturableSquares;
 
 			// checks & pins
-			if (isInCheck) {
-				moves &= checkEvasionMask;
-			}
+			moves &= checkEvasionMask;
 
 			if (currRook & pinMask) {
-				moves &= LINE_MASK[std::countr_zero(currRook)][kingSq];
+				moves &= LINE_MASK[currRookSq][kingSq];
 			}
 
 			addMovesToList(moveList, currRook, moves, PT_ROOK);
@@ -244,20 +261,19 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 		}
 
 		// queens
-		Bitboard queens = position->pieces[position->usColor * 6 + PT_QUEEN];
+		Bitboard queens = P[UsColor * 6 + PT_QUEEN];
 		while (queens) {
 			Bitboard currQueen = queens & -queens;
-			Bitboard moves = (getRookAttacks(std::countr_zero(currQueen), occ) |
-			                  getBishopAttacks(std::countr_zero(currQueen), occ)) &
-			                 capturableSquares;
+			int currQueenSq = std::countr_zero(currQueen);
+			Bitboard moves =
+			    (getRookAttacks(currQueenSq, occ) | getBishopAttacks(currQueenSq, occ)) &
+			    capturableSquares;
 
 			// checks & pins
-			if (isInCheck) {
-				moves &= checkEvasionMask;
-			}
+			moves &= checkEvasionMask;
 
 			if (currQueen & pinMask) {
-				moves &= LINE_MASK[std::countr_zero(currQueen)][kingSq];
+				moves &= LINE_MASK[currQueenSq][kingSq];
 			}
 
 			addMovesToList(moveList, currQueen, moves, PT_QUEEN);
@@ -267,10 +283,11 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 
 	// king
 	Bitboard kingMoves = KING_MOVE_MASK[kingSq] & capturableSquares & ~attackMask;
-	addMovesToList(moveList, position->pieces[position->usColor * 6 + PT_KING], kingMoves, PT_KING);
+	addMovesToList(moveList, P[UsColor * 6 + PT_KING], kingMoves, PT_KING);
 
+	// castling generation if not in check
 	if (!isInCheck) {
-		if (position->usColor == WHITE) {
+		if constexpr (UsColor == WHITE) {
 			constexpr Bitboard E1 = 1ULL << 4, F1 = 1ULL << 5, G1 = 1ULL << 6, D1 = 1ULL << 3,
 			                   C1 = 1ULL << 2, B1 = 1ULL << 1;
 			// we are white
@@ -316,95 +333,89 @@ MoveList MoveGenerator::generateLegalMoves(void) const {
 	return moveList;
 }
 
-Bitboard MoveGenerator::computeAttackMask(Bitboard occ) const {
+template <int UsColor>
+Bitboard MoveGenerator::computeAttackMaskT(void) const {
+	constexpr int OppColor = UsColor ^ 1;
+
 	Bitboard attackMask = 0ULL;
 
 	// pawns
-	if (position->usColor == WHITE) {
+	if constexpr (UsColor == WHITE) {
 		// we are white
-		attackMask |= ((position->pieces[PT_PAWN + 6] & ~FILE_A) >> 9) |
-		              ((position->pieces[PT_PAWN + 6] & ~FILE_H) >> 7);
+		attackMask |= ((P[PT_PAWN + 6] & ~FILE_A) >> 9) | ((P[PT_PAWN + 6] & ~FILE_H) >> 7);
 	}
 	else {
 		// we are black
-		attackMask |= ((position->pieces[PT_PAWN] & ~FILE_H) << 9) |
-		              ((position->pieces[PT_PAWN] & ~FILE_A) << 7);
+		attackMask |= ((P[PT_PAWN] & ~FILE_H) << 9) | ((P[PT_PAWN] & ~FILE_A) << 7);
 	}
 
-	Bitboard occWithoutKing = occ & ~position->pieces[position->usColor * 6 + PT_KING];
+	Bitboard occWithoutKing = occ & ~P[UsColor * 6 + PT_KING];
 
 	// rooks & queens
-	Bitboard oppRooksQueens = position->pieces[position->oppColor * 6 + PT_ROOK] |
-	                          position->pieces[position->oppColor * 6 + PT_QUEEN];
-	while (oppRooksQueens) {
-		attackMask |= getRookAttacks(std::countr_zero(oppRooksQueens), occWithoutKing);
-		oppRooksQueens &= oppRooksQueens - 1;
+	Bitboard localOppRooksQueens = oppRooksQueens;
+	while (localOppRooksQueens) {
+		attackMask |= getRookAttacks(std::countr_zero(localOppRooksQueens), occWithoutKing);
+		localOppRooksQueens &= localOppRooksQueens - 1;
 	}
 
 	// bishops & queens
-	Bitboard oppBishopsQueens = position->pieces[position->oppColor * 6 + PT_BISHOP] |
-	                            position->pieces[position->oppColor * 6 + PT_QUEEN];
-	while (oppBishopsQueens) {
-		attackMask |= getBishopAttacks(std::countr_zero(oppBishopsQueens), occWithoutKing);
-		oppBishopsQueens &= oppBishopsQueens - 1;
+	Bitboard localOppBishopsQueens = oppBishopsQueens;
+	while (localOppBishopsQueens) {
+		attackMask |= getBishopAttacks(std::countr_zero(localOppBishopsQueens), occWithoutKing);
+		localOppBishopsQueens &= localOppBishopsQueens - 1;
 	}
 
 	// knights
-	Bitboard oppKnights = position->pieces[position->oppColor * 6 + PT_KNIGHT];
+	Bitboard oppKnights = P[OppColor * 6 + PT_KNIGHT];
 	while (oppKnights) {
 		attackMask |= KNIGHT_MOVE_MASK[std::countr_zero(oppKnights)];
 		oppKnights &= oppKnights - 1;
 	}
 
 	// king
-	int enemyKingSq = std::countr_zero(position->pieces[position->oppColor * 6 + PT_KING]);
+	int enemyKingSq = std::countr_zero(P[OppColor * 6 + PT_KING]);
 	assert(enemyKingSq < 64);
 	attackMask |= KING_MOVE_MASK[enemyKingSq];
 
 	return attackMask;
 }
 
-Bitboard MoveGenerator::computeCheckerMask(int kingSq, Bitboard occ) const {
+template <int UsColor>
+Bitboard MoveGenerator::computeCheckerMaskT(void) const {
+	constexpr int OppColor = UsColor ^ 1;
+
 	Bitboard checkerMask = 0ULL;
 
 	// pawns
-	if (position->usColor == WHITE) {
+	if constexpr (UsColor == WHITE) {
 		// we are white
 		// use white pawns beacause we are looking from the perspective of the king
 		checkerMask |=
 		    (WHITE_PAWN_CAPTURE_LEFT_MASK[kingSq] | WHITE_PAWN_CAPTURE_RIGHT_MASK[kingSq]) &
-		    position->pieces[PT_PAWN + 6];
+		    P[PT_PAWN + 6];
 	}
 	else {
 		// we are black
 		// use black pawns beacause we are looking from the perspective of the king
 		checkerMask |=
 		    (BLACK_PAWN_CAPTURE_LEFT_MASK[kingSq] | BLACK_PAWN_CAPTURE_RIGHT_MASK[kingSq]) &
-		    position->pieces[PT_PAWN];
+		    P[PT_PAWN];
 	}
 
 	// rooks & queens
-	Bitboard oppRooksQueens = position->pieces[position->oppColor * 6 + PT_ROOK] |
-	                          position->pieces[position->oppColor * 6 + PT_QUEEN];
 	checkerMask |= getRookAttacks(kingSq, occ) & oppRooksQueens;
 
 	// bishops & queens
-	Bitboard oppBishopsQueens = position->pieces[position->oppColor * 6 + PT_BISHOP] |
-	                            position->pieces[position->oppColor * 6 + PT_QUEEN];
 	checkerMask |= getBishopAttacks(kingSq, occ) & oppBishopsQueens;
 
 	// knights
-	checkerMask |= KNIGHT_MOVE_MASK[kingSq] & position->pieces[position->oppColor * 6 + PT_KNIGHT];
+	checkerMask |= KNIGHT_MOVE_MASK[kingSq] & P[OppColor * 6 + PT_KNIGHT];
 
 	return checkerMask;
 }
 
-Bitboard MoveGenerator::computePinMask(int kingSq, Bitboard occ) const {
-	Bitboard oppRooksQueens = position->pieces[position->oppColor * 6 + PT_ROOK] |
-	                          position->pieces[position->oppColor * 6 + PT_QUEEN];
-	Bitboard oppBishopsQueens = position->pieces[position->oppColor * 6 + PT_BISHOP] |
-	                            position->pieces[position->oppColor * 6 + PT_QUEEN];
-
+template <int UsColor>
+Bitboard MoveGenerator::computePinMaskT(void) const {
 	Bitboard potentialPinners =
 	    (ROOK_XRAY_MASK[kingSq] & oppRooksQueens) | (BISHOP_XRAY_MASK[kingSq] & oppBishopsQueens);
 
@@ -415,7 +426,7 @@ Bitboard MoveGenerator::computePinMask(int kingSq, Bitboard occ) const {
 		Bitboard between = BETWEEN_MASK[pinnerSq][kingSq] & occ;
 
 		// if there is exactly one piece in between and it is friendly
-		if (std::has_single_bit(between) && (between & position->occForColor[position->usColor])) {
+		if (std::has_single_bit(between) && (between & usOcc)) {
 			pinMask |= between;
 		}
 
@@ -425,15 +436,21 @@ Bitboard MoveGenerator::computePinMask(int kingSq, Bitboard occ) const {
 	return pinMask;
 }
 
-bool MoveGenerator::isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) const {
+template <int UsColor>
+bool MoveGenerator::isEpLegalT(Bitboard capturingPawn) const {
 	// this function only does a quick horizontal check, which is not covered by pin detection
 
-	Bitboard capturedPawn =
-	    position->usColor == WHITE ? position->epSquare >> 8 : position->epSquare << 8;
-
 	// no en-passant
-	if (!capturingPawn) {
+	if (!position->epSquare) {
 		return false;
+	}
+
+	Bitboard capturedPawn;
+	if constexpr (UsColor == WHITE) {
+		capturedPawn = position->epSquare >> 8;
+	}
+	else {
+		capturedPawn = position->epSquare << 8;
 	}
 
 	int epRank = std::countr_zero(capturedPawn) >> 3;
@@ -445,8 +462,6 @@ bool MoveGenerator::isEpLegal(int kingSq, Bitboard occ, Bitboard capturingPawn) 
 
 	// occupancy without both pawns
 	Bitboard occWithoutPawns = occ & ~capturingPawn & ~capturedPawn;
-	Bitboard oppRooksQueens = position->pieces[position->oppColor * 6 + PT_ROOK] |
-	                          position->pieces[position->oppColor * 6 + PT_QUEEN];
 	Bitboard relevantAttackers =
 	    (RANK_1 << (8 * epRank)) &
 	    oppRooksQueens;  // attackers are only relevant if they can check horizontally

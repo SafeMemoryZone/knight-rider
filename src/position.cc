@@ -258,6 +258,28 @@ constexpr Bitboard G8 = 1ULL << 62;
 constexpr Bitboard H8 = 1ULL << 63;
 
 void Position::makeMove(Move move) {
+	if (usColor == WHITE) {
+		makeMoveT<WHITE>(move);
+	}
+	else {
+		makeMoveT<BLACK>(move);
+	}
+}
+
+void Position::undoMove(void) {
+	if (usColor == WHITE) {
+		// already give inverted color
+		undoMoveT<BLACK>();
+	}
+	else {
+		undoMoveT<WHITE>();
+	}
+}
+
+template <int UsColor>
+void Position::makeMoveT(Move move) {
+	constexpr int OppColor = UsColor ^ 1;
+
 	UndoInfo &u = undoStack[ply++];
 	uint32_t rawMove = std::bit_cast<uint32_t>(move);
 	u.move = rawMove;
@@ -274,22 +296,28 @@ void Position::makeMove(Move move) {
 
 	int capturedType = PT_NULL;
 	if (isEp) {
-		Bitboard capSquare = usColor == WHITE ? (to >> 8) : (to << 8);
+		Bitboard capSquare;
+		if constexpr (UsColor == WHITE) {
+			capSquare = to >> 8;
+		}
+		else {
+			capSquare = to << 8;
+		}
 		// find the pawn on that square
 		capturedType = PT_PAWN;
-		pieces[oppColor * 6 + PT_PAWN] ^= capSquare;
-		occForColor[oppColor] ^= capSquare;
+		pieces[OppColor * 6 + PT_PAWN] ^= capSquare;
+		occForColor[OppColor] ^= capSquare;
 	}
 	else {
 		// normal capture
-		Bitboard hit = to & occForColor[oppColor];
+		Bitboard hit = to & occForColor[OppColor];
 		if (hit) {
 			// find which piece type
-			for (uint8_t pt = 0; pt < 6; ++pt) {
-				if (pieces[oppColor * 6 + pt] & hit) {
+			for (int pt = 0; pt < 6; ++pt) {
+				if (pieces[OppColor * 6 + pt] & hit) {
 					capturedType = pt;
-					pieces[oppColor * 6 + pt] ^= hit;
-					occForColor[oppColor] ^= hit;
+					pieces[OppColor * 6 + pt] ^= hit;
+					occForColor[OppColor] ^= hit;
 					break;
 				}
 			}
@@ -298,29 +326,29 @@ void Position::makeMove(Move move) {
 	u.capturedType = (uint8_t)capturedType;
 
 	// move the actual piece
-	int base = usColor * 6 + movingPt;
+	int base = UsColor * 6 + movingPt;
 	pieces[base] ^= (from | to);
-	occForColor[usColor] ^= (from | to);
+	occForColor[UsColor] ^= (from | to);
 
 	// promotions
 	if (promoPt != PT_NULL) {
 		pieces[base] ^= to;
-		pieces[usColor * 6 + promoPt] ^= to;
+		pieces[UsColor * 6 + promoPt] ^= to;
 	}
 
 	// move rook when castling
 	if (isCastling) {
-		if (usColor == WHITE) {
+		if constexpr (UsColor == WHITE) {
 			// white to move
 			if (to == G1) {
 				// king side: rook H1 -> F1
 				pieces[PT_ROOK] ^= H1 | F1;
-				occForColor[usColor] ^= H1 | F1;
+				occForColor[UsColor] ^= H1 | F1;
 			}
 			else {
 				// queen side: rook A1 -> D1
 				pieces[PT_ROOK] ^= A1 | D1;
-				occForColor[usColor] ^= A1 | D1;
+				occForColor[UsColor] ^= A1 | D1;
 			}
 		}
 		else {
@@ -328,12 +356,12 @@ void Position::makeMove(Move move) {
 			if (to == G8) {
 				// king side: rook H8 -> F8
 				pieces[6 + PT_ROOK] ^= H8 | F8;
-				occForColor[usColor] ^= H8 | F8;
+				occForColor[UsColor] ^= H8 | F8;
 			}
 			else {
 				// queen side: rook A8 -> D8
 				pieces[6 + PT_ROOK] ^= A8 | D8;
-				occForColor[usColor] ^= A8 | D8;
+				occForColor[UsColor] ^= A8 | D8;
 			}
 		}
 	}
@@ -368,7 +396,12 @@ void Position::makeMove(Move move) {
 	}
 	// case 2: king moved
 	if (movingPt == PT_KING) {
-		castlingRights &= usColor == WHITE ? 0b1100 : 0b0011;
+		if constexpr (UsColor == WHITE) {
+			castlingRights &= 0b1100;
+		}
+		else {
+			castlingRights &= 0b0011;
+		}
 	}
 
 	// update 50-move rule counter
@@ -384,7 +417,8 @@ void Position::makeMove(Move move) {
 	oppColor ^= 1;
 }
 
-void Position::undoMove() {
+template <int UsColor>
+void Position::undoMoveT() {
 	UndoInfo &undoInfo = undoStack[--ply];
 	epSquare = undoInfo.epSquare;
 	rule50 = undoInfo.halfmoveClock;
@@ -392,6 +426,8 @@ void Position::undoMove() {
 
 	usColor ^= 1;
 	oppColor ^= 1;
+
+	constexpr int OppColor = UsColor ^ 1;
 
 	// recreate move
 	Move move = std::bit_cast<Move>(undoInfo.move);
@@ -405,7 +441,7 @@ void Position::undoMove() {
 
 	// move the rook back if it was castling
 	if (isCastling) {
-		if (usColor == WHITE) {
+		if constexpr (UsColor == WHITE) {
 			// white just castled
 			if (to == G1) {
 				pieces[PT_ROOK] ^= (F1 | H1);
@@ -430,27 +466,32 @@ void Position::undoMove() {
 	}
 
 	// undo the moving piece or promotion
-	int base = usColor * 6 + movingPt;
+	int base = UsColor * 6 + movingPt;
 	if (promoPt != PT_NULL) {
-		pieces[usColor * 6 + promoPt] ^= to;
+		pieces[UsColor * 6 + promoPt] ^= to;
 		pieces[base] ^= from;
-		occForColor[usColor] ^= (from | to);
+		occForColor[UsColor] ^= (from | to);
 	}
 	else {
 		pieces[base] ^= (from | to);
-		occForColor[usColor] ^= (from | to);
+		occForColor[UsColor] ^= (from | to);
 	}
 
 	// restore captured piece
 	if (capturedType != PT_NULL) {
 		Bitboard capturedSquare;
 		if (isEp) {
-			capturedSquare = (usColor == WHITE ? (to >> 8) : (to << 8));
+			if constexpr (UsColor == WHITE) {
+				capturedSquare = to >> 8;
+			}
+			else {
+				capturedSquare = to << 8;
+			}
 		}
 		else {
 			capturedSquare = to;
 		}
-		pieces[oppColor * 6 + capturedType] ^= capturedSquare;
-		occForColor[oppColor] ^= capturedSquare;
+		pieces[OppColor * 6 + capturedType] ^= capturedSquare;
+		occForColor[OppColor] ^= capturedSquare;
 	}
 }
