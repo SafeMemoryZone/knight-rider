@@ -14,10 +14,7 @@ endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -flto")
-    
-    # native architecture optimization
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -march=native")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -flto -march=native")
     
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Od /Wall /permissive-")
@@ -28,7 +25,6 @@ endif()
 # source organization
 file(GLOB_RECURSE SOURCES "src/*.cc")
 file(GLOB_RECURSE HEADERS "src/*.h" "src/*.hpp")
-
 
 # create main executable
 add_executable(${PROJECT_NAME} ${SOURCES})
