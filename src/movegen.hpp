@@ -15,7 +15,7 @@ constexpr int PT_NULL = 6;
 
 class Move {
    public:
-	Move() = default;
+	Move(void) = default;
 	Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
 
 	inline std::string toLan(void) const;
@@ -69,16 +69,16 @@ inline bool Move::getIsEp() const { return (move >> 19) & 1; }
 
 class MoveList {
    public:
-	MoveList() = default;
+	MoveList(void) = default;
 
 	inline int getMovesCount(void);
 	inline void add(Move move);
-	Move* begin() { return moves; }
-	Move* end() { return moves + movesCount; }
-	const Move* begin() const { return moves; }
-	const Move* end() const { return moves + movesCount; }
-	const Move* cbegin() const { return moves; }
-	const Move* cend() const { return moves + movesCount; }
+	Move* begin(void) { return moves; }
+	Move* end(void) { return moves + movesCount; }
+	const Move* begin(void) const { return moves; }
+	const Move* end(void) const { return moves + movesCount; }
+	const Move* cbegin(void) const { return moves; }
+	const Move* cend(void) const { return moves + movesCount; }
 	const Move& operator[](size_t index) const { return moves[index]; }
 
    private:
@@ -94,7 +94,7 @@ inline int MoveList::getMovesCount(void) { return movesCount; }
 
 class MoveGenerator {
    public:
-	MoveGenerator() = default;
+	MoveGenerator(void) = default;
 	MoveGenerator(Position* position);
 
 	MoveList generateLegalMoves(void) const;

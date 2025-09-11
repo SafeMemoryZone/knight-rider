@@ -6,7 +6,7 @@
 
 int main() {
 	initBitboards();
-	Position pos("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10");
+	Position pos("2B1bN2/1pQ1qP2/7k/2p5/1Pp1P2p/5p2/4p3/K7 w - - 0 1");
 	MoveGenerator gen(&pos);
 
 	std::cout << pos.toFen() << '\n';
