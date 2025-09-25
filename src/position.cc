@@ -7,12 +7,9 @@
 #include <string>
 
 #include "bitboards.hpp"
-#include "movegen.hpp"
+#include "misc.hpp"
 
-static UndoInfo undoStack[MAX_PLY];
-static int ply = 0;
-
-Position::Position()
+Position::Position(void)
     : occForColor{},
       epSquare(0),
       rule50(0),
@@ -281,8 +278,7 @@ void Position::makeMoveT(Move move) {
 	constexpr int OppColor = UsColor ^ 1;
 
 	UndoInfo &u = undoStack[ply++];
-	uint32_t rawMove = std::bit_cast<uint32_t>(move);
-	u.move = rawMove;
+	u.move = move;
 	u.castlingRights = castlingRights;
 	u.epSquare = epSquare;
 	u.halfmoveClock = rule50;
@@ -419,10 +415,10 @@ void Position::makeMoveT(Move move) {
 
 template <int UsColor>
 void Position::undoMoveT() {
-	UndoInfo &undoInfo = undoStack[--ply];
-	epSquare = undoInfo.epSquare;
-	rule50 = undoInfo.halfmoveClock;
-	castlingRights = undoInfo.castlingRights;
+	UndoInfo &u = undoStack[--ply];
+	epSquare = u.epSquare;
+	rule50 = u.halfmoveClock;
+	castlingRights = u.castlingRights;
 
 	usColor ^= 1;
 	oppColor ^= 1;
@@ -430,14 +426,14 @@ void Position::undoMoveT() {
 	constexpr int OppColor = UsColor ^ 1;
 
 	// recreate move
-	Move move = std::bit_cast<Move>(undoInfo.move);
+	Move move = u.move;
 	Bitboard from = move.getFrom();
 	Bitboard to = move.getTo();
 	int movingPt = move.getMovingPt();
 	int promoPt = move.getPromoPt();
 	bool isEp = move.getIsEp();
 	bool isCastling = move.getIsCastling();
-	uint8_t capturedType = undoInfo.capturedType;
+	uint8_t capturedType = u.capturedType;
 
 	// move the rook back if it was castling
 	if (isCastling) {
@@ -495,3 +491,5 @@ void Position::undoMoveT() {
 		occForColor[OppColor] ^= capturedSquare;
 	}
 }
+
+void Position::resetPly(void) { ply = 0; }

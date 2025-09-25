@@ -17,19 +17,9 @@ static inline Bitboard getBishopAttacks(int sq, Bitboard occ) {
 static inline void addMovesToList(MoveList &moveList, Bitboard from, Bitboard allMoves, int pt) {
 	while (allMoves) {
 		Bitboard currMove = allMoves & -allMoves;
-		moveList.add(Move(from, currMove, pt, PT_NULL, false, false));
+		moveList.push_back(Move(from, currMove, pt, PT_NULL, false, false));
 		allMoves &= allMoves - 1;
 	}
-}
-
-Move::Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp)
-    : move(0) {
-	move |= std::countr_zero(from) & 0x3F;
-	move |= static_cast<uint32_t>(std::countr_zero(to) & 0x3F) << 6;
-	move |= static_cast<uint32_t>(movingPt & 7) << 12;
-	move |= static_cast<uint32_t>(promoPt & 7) << 15;
-	move |= static_cast<uint32_t>(isCastling & 1) << 18;
-	move |= static_cast<uint32_t>(isEp & 1) << 19;
 }
 
 MoveGenerator::MoveGenerator(Position *position) : position(position), P(position->pieces) {}
@@ -69,6 +59,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 	const Bitboard checkerMask = computeCheckerMaskT<UsColor>();
 	const int checkCount = std::popcount(checkerMask);
 	const bool isInCheck = checkCount != 0;
+	moveList.setInCheck(isInCheck);
 	const bool isInDoubleCheck = checkCount > 1;
 	// if in normal check and the checking piece is a slider piece, generate the block mask
 	const Bitboard sliderCheckers =
@@ -125,7 +116,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 
 				// add en-passant move
 				if (ep) {
-					moveList.add(Move(currPawn, ep, PT_PAWN, PT_NULL, false, true));
+					moveList.push_back(Move(currPawn, ep, PT_PAWN, PT_NULL, false, true));
 				}
 
 				// add each normal move
@@ -134,13 +125,13 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 
 					// promotion
 					if (to & RANK_8) {
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_KNIGHT, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_BISHOP, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_ROOK, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_QUEEN, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_KNIGHT, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_BISHOP, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_ROOK, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_QUEEN, false, false));
 					}
 					else {
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_NULL, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_NULL, false, false));
 					}
 
 					normalMoves &= normalMoves - 1;
@@ -180,7 +171,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 
 				// add en-passant move
 				if (ep) {
-					moveList.add(Move(currPawn, ep, PT_PAWN, PT_NULL, false, true));
+					moveList.push_back(Move(currPawn, ep, PT_PAWN, PT_NULL, false, true));
 				}
 
 				// add each normal move
@@ -189,13 +180,13 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 
 					// promotion
 					if (to & RANK_1) {
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_KNIGHT, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_BISHOP, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_ROOK, false, false));
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_QUEEN, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_KNIGHT, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_BISHOP, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_ROOK, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_QUEEN, false, false));
 					}
 					else {
-						moveList.add(Move(currPawn, to, PT_PAWN, PT_NULL, false, false));
+						moveList.push_back(Move(currPawn, to, PT_PAWN, PT_NULL, false, false));
 					}
 
 					normalMoves &= normalMoves - 1;
@@ -296,7 +287,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 				Bitboard between = F1 | G1;
 				// squares empty && not attacked
 				if (!(occ & between) && !(attackMask & between)) {
-					moveList.add(Move(E1, G1, PT_KING, PT_NULL, true, false));
+					moveList.push_back(Move(E1, G1, PT_KING, PT_NULL, true, false));
 				}
 			}
 			// queen-side
@@ -304,7 +295,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 				Bitboard between = B1 | C1 | D1;
 				Bitboard passSquares = D1 | C1;
 				if (!(occ & between) && !(attackMask & passSquares)) {
-					moveList.add(Move(E1, C1, PT_KING, PT_NULL, true, false));
+					moveList.push_back(Move(E1, C1, PT_KING, PT_NULL, true, false));
 				}
 			}
 		}
@@ -316,7 +307,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 			if (position->castlingRights & BLACK_KING_SIDE_CASTLE) {
 				Bitboard between = F8 | G8;
 				if (!(occ & between) && !(attackMask & between)) {
-					moveList.add(Move(E8, G8, PT_KING, PT_NULL, true, false));
+					moveList.push_back(Move(E8, G8, PT_KING, PT_NULL, true, false));
 				}
 			}
 			// queen-side
@@ -324,7 +315,7 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 				Bitboard between = B8 | C8 | D8;
 				Bitboard passSquares = D8 | C8;
 				if (!(occ & between) && !(attackMask & passSquares)) {
-					moveList.add(Move(E8, C8, PT_KING, PT_NULL, true, false));
+					moveList.push_back(Move(E8, C8, PT_KING, PT_NULL, true, false));
 				}
 			}
 		}

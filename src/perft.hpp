@@ -3,7 +3,7 @@
 
 #include "position.hpp"
 
-void initPerft(Position position);
-size_t perft(int depth, bool printCountAfterMoves);
+void initPerft(const Position &position);
+size_t perft(int depth, bool printPerftLine);
 
 #endif  // PERFT_HPP

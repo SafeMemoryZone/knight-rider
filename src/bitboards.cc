@@ -1,5 +1,7 @@
 #include "bitboards.hpp"
 
+#include <bit>
+
 // moving masks
 Bitboard KING_MOVE_MASK[64];
 Bitboard KNIGHT_MOVE_MASK[64];

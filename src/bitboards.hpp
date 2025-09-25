@@ -1,6 +1,7 @@
 #ifndef BITBOARDS_HPP
 #define BITBOARDS_HPP
-#include "position.hpp"
+
+#include "misc.hpp"
 
 // bitboard constants
 constexpr Bitboard RANK_1 = 0x00000000000000FFULL;
@@ -83,4 +84,5 @@ constexpr Bitboard BISHOP_MAGIC[64] = {
 };
 
 void initBitboards(void);
+
 #endif  // BITBOARDS_HPP

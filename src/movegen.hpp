@@ -1,101 +1,13 @@
 #ifndef MOVEGEN_HPP
 #define MOVEGEN_HPP
 
-#include <cstdint>
-
+#include "movelist.hpp"
 #include "position.hpp"
-
-constexpr int PT_PAWN = 0;
-constexpr int PT_KNIGHT = 1;
-constexpr int PT_BISHOP = 2;
-constexpr int PT_ROOK = 3;
-constexpr int PT_QUEEN = 4;
-constexpr int PT_KING = 5;
-constexpr int PT_NULL = 6;
-
-class Move {
-   public:
-	Move(void) = default;
-	Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
-
-	inline std::string toLan(void) const;
-	inline Bitboard getFrom() const;
-	inline Bitboard getTo() const;
-	inline int getMovingPt() const;
-	inline int getPromoPt() const;
-	inline bool getIsCastling() const;
-	inline bool getIsEp() const;
-
-   private:
-	uint32_t move;
-};
-
-inline std::string Move::toLan() const {
-	int fromSq = move & 0x3F;
-	int toSq = (move >> 6) & 0x3F;
-	int promoPt = (move >> 15) & 0x7;
-
-	char fromFile = char('a' + (fromSq & 7));
-	char fromRank = char('1' + (fromSq >> 3));
-	char toFile = char('a' + (toSq & 7));
-	char toRank = char('1' + (toSq >> 3));
-
-	std::string s;
-	s.reserve(5);
-	s.push_back(fromFile);
-	s.push_back(fromRank);
-	s.push_back(toFile);
-	s.push_back(toRank);
-
-	if (promoPt != PT_NULL) {
-		static constexpr char promoChar[7] = {0, 'n', 'b', 'r', 'q', 0, 0};
-		s.push_back(promoChar[promoPt]);
-	}
-
-	return s;
-}
-
-inline Bitboard Move::getFrom() const { return 1ULL << (move & 0x3F); }
-
-inline Bitboard Move::getTo() const { return 1ULL << ((move >> 6) & 0x3F); }
-
-inline int Move::getMovingPt() const { return (move >> 12) & 7; }
-
-inline int Move::getPromoPt() const { return (move >> 15) & 7; }
-
-inline bool Move::getIsCastling() const { return (move >> 18) & 1; }
-
-inline bool Move::getIsEp() const { return (move >> 19) & 1; }
-
-class MoveList {
-   public:
-	MoveList(void) = default;
-
-	inline int getMovesCount(void);
-	inline void add(Move move);
-	Move* begin(void) { return moves; }
-	Move* end(void) { return moves + movesCount; }
-	const Move* begin(void) const { return moves; }
-	const Move* end(void) const { return moves + movesCount; }
-	const Move* cbegin(void) const { return moves; }
-	const Move* cend(void) const { return moves + movesCount; }
-	const Move& operator[](size_t index) const { return moves[index]; }
-
-   private:
-	static constexpr int MAX_MOVES = 256;
-
-	Move moves[MAX_MOVES];
-	int movesCount = 0;
-};
-
-inline void MoveList::add(Move move) { moves[movesCount++] = move; }
-
-inline int MoveList::getMovesCount(void) { return movesCount; }
 
 class MoveGenerator {
    public:
 	MoveGenerator(void) = default;
-	MoveGenerator(Position* position);
+	explicit MoveGenerator(Position* position);
 
 	MoveList generateLegalMoves(void) const;
 
