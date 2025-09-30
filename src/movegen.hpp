@@ -12,6 +12,7 @@ class MoveGenerator {
 	MoveList generateLegalMoves(void) const;
 
    private:
+	// color-specific templates
 	template <int UsColor>
 	MoveList generateLegalMovesT(void) const;
 	template <int UsColor>
@@ -23,8 +24,8 @@ class MoveGenerator {
 	template <int UsColor>
 	bool isEpLegalT(Bitboard capturingPawn) const;
 
-	Position* position;
-	Bitboard* P;  // alias for position->pieces
+	Position* position = nullptr;
+	Bitboard* P = nullptr;  // alias for position->pieces
 };
 
 #endif  // MOVEGEN_HPP

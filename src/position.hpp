@@ -7,6 +7,7 @@
 #include "misc.hpp"
 #include "move.hpp"
 
+// undo info for a single move
 struct UndoInfo {
 	Bitboard epSquare;
 	Move move;
@@ -15,16 +16,20 @@ struct UndoInfo {
 	uint8_t capturedType;
 };
 
+// chess position representation
 struct Position {
+	static Position fromFen(const std::string &fen, bool &success) noexcept;
+
 	Position(void);
-	explicit Position(const std::string &fen);
 
 	bool operator==(const Position &other) const noexcept;
+
 	std::string toFen(void) const;
 	void makeMove(Move move);
 	void undoMove(void);
 	void resetPly(void);
 
+	// board state
 	Bitboard occForColor[2];
 	Bitboard pieces[12];
 	Bitboard epSquare;

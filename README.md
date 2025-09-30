@@ -2,11 +2,21 @@
 
 A lightweight chess engine written in C++ with a focus on clean code and solid tactical play.
 
+## Quick Start
+
+- Build with CMake  
+- [Connect to Lichess](https://github.com/lichess-bot-devs/lichess-bot)
+
 ## Performance test
 
 Tested on a MacBook Air (Apple M2, 8 cores: 4 performance + 4 efficiency, 16 GB RAM).  
 Compiled with: `-O3 -DNDEBUG -flto -march=native`.
 On this setup, knight-rider achieves about *340M leaf nodes/s* from the start position to depth 8 in perft
+
+## Instructions
+
+- Compile the project using cmake
+- Follow the instructions https://github.com/lichess-bot-devs/lichess-bot to connect lichess to this engine
 
 ## License
 

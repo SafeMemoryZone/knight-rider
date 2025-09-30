@@ -36,127 +36,131 @@ Position::Position(void)
 	}
 }
 
-Position::Position(const std::string &fen)
-    : occForColor{}, pieces{}, epSquare(0), rule50(0), castlingRights(0) {
-	std::istringstream stream(fen);
+Position Position::fromFen(const std::string &fen, bool &success) noexcept {
+	success = false;
 
-	std::string piecePlacement;
-	std::string activeColorStr;
-	std::string castlingRightsStr;
-	std::string epSqStr;
-	std::string rule50Str;
-	std::string fullMoveStr;
+	Position pos{};
 
-	if (!(stream >> piecePlacement >> activeColorStr >> castlingRightsStr >> epSqStr >> rule50Str >>
-	      fullMoveStr)) {
-		throw std::runtime_error("Invalid FEN: missing fields");
-	}
+	try {
+		std::istringstream stream(fen);
 
-	// piece placement
-	int rank = 7;
-	int file = 0;
-	for (char c : piecePlacement) {
-		if (std::isdigit(c)) {
-			file += c - '0';
-			continue;
+		std::string piecePlacement;
+		std::string activeColorStr;
+		std::string castlingRightsStr;
+		std::string epSqStr;
+		std::string rule50Str;
+		std::string fullMoveStr;
+
+		if (!(stream >> piecePlacement >> activeColorStr >> castlingRightsStr >> epSqStr >>
+		      rule50Str >> fullMoveStr)) {
+			return pos;  // missing fields
 		}
-		if (c == '/') {
-			if (file != 8) {
-				throw std::runtime_error("Invalid FEN: row not complete");
-			}
-			rank--;
-			file = 0;
-			continue;
-		}
-		if (rank < 0 || rank > 7 || file < 0 || file > 7) {
-			throw std::runtime_error("Invalid FEN: bad board coords");
-		}
+
+		int rank = 7;
+		int file = 0;
 
 		static const std::unordered_map<char, int> charToPieceIdx = {
 		    {'P', PT_PAWN},       {'N', PT_KNIGHT},   {'B', PT_BISHOP},    {'R', PT_ROOK},
 		    {'Q', PT_QUEEN},      {'K', PT_KING},     {'p', PT_PAWN + 6},  {'n', PT_KNIGHT + 6},
 		    {'b', PT_BISHOP + 6}, {'r', PT_ROOK + 6}, {'q', PT_QUEEN + 6}, {'k', PT_KING + 6}};
 
-		auto it = charToPieceIdx.find(c);
-		if (it == charToPieceIdx.end()) {
-			throw std::runtime_error("Invalid FEN: invalid piece char in placement");
+		for (char c : piecePlacement) {
+			if (std::isdigit(static_cast<unsigned char>(c))) {
+				file += c - '0';
+				if (file > 8) return pos;  // too many squares in a rank
+				continue;
+			}
+			if (c == '/') {
+				if (file != 8) return pos;  // rank incomplete
+				rank--;
+				if (rank < 0) return pos;  // too many ranks
+				file = 0;
+				continue;
+			}
+
+			if (rank < 0 || rank > 7 || file < 0 || file > 7) return pos;
+
+			auto it = charToPieceIdx.find(c);
+			if (it == charToPieceIdx.end()) return pos;  // invalid piece char
+
+			pos.pieces[it->second] |= (1ULL << (rank * 8 + file));
+			file++;
 		}
 
-		pieces[it->second] |= 1ULL << (rank * 8 + file);
-		file++;
-	}
+		if (rank != 0 || file != 8) return pos;
 
-	if (rank != 0 || file != 8) {
-		throw std::runtime_error("Invalid FEN: board dimensions incorrect");
-	}
-
-	// update occupancy
-	for (int color = 0; color < 2; color++) {
-		for (int pt = 0; pt < 6; pt++) {
-			occForColor[color] |= pieces[color * 6 + pt];
-		}
-	}
-
-	// active color
-	if (activeColorStr == "w") {
-		usColor = WHITE;
-		oppColor = BLACK;
-	}
-	else if (activeColorStr == "b") {
-		usColor = BLACK;
-		oppColor = WHITE;
-	}
-	else {
-		throw std::runtime_error("Invalid FEN: invalid active color");
-	}
-
-	// castling rights
-	if (castlingRightsStr != "-") {
-		for (char c : castlingRightsStr) {
-			switch (c) {
-				case 'k':
-					castlingRights |= BLACK_KING_SIDE_CASTLE;
-					break;
-				case 'q':
-					castlingRights |= BLACK_QUEEN_SIDE_CASTLE;
-					break;
-				case 'K':
-					castlingRights |= WHITE_KING_SIDE_CASTLE;
-					break;
-				case 'Q':
-					castlingRights |= WHITE_QUEEN_SIDE_CASTLE;
-					break;
-				default:
-					throw std::runtime_error("Invalid FEN: invalid castling right");
+		// occupany
+		pos.occForColor[0] = 0;
+		pos.occForColor[1] = 0;
+		for (int color = 0; color < 2; ++color) {
+			for (int pt = 0; pt < 6; ++pt) {
+				pos.occForColor[color] |= pos.pieces[color * 6 + pt];
 			}
 		}
-	}
 
-	// en-passant square
-	if (epSqStr != "-") {
-		if (epSqStr.length() != 2) {
-			throw std::runtime_error("Invalid FEN: invalid en-passant square");
+		if (activeColorStr == "w") {
+			pos.usColor = WHITE;
+			pos.oppColor = BLACK;
+		}
+		else if (activeColorStr == "b") {
+			pos.usColor = BLACK;
+			pos.oppColor = WHITE;
+		}
+		else {
+			return pos;
 		}
 
-		int epFile = epSqStr.at(0) - 'a';
-		int epRank = epSqStr.at(1) - '1';
-
-		if (epFile < 0 || epFile > 7 || epRank < 0 || epRank > 7) {
-			throw std::runtime_error("Invalid FEN: invalid en-passant square");
+		pos.castlingRights = 0;
+		if (castlingRightsStr != "-") {
+			for (char c : castlingRightsStr) {
+				switch (c) {
+					case 'K':
+						pos.castlingRights |= WHITE_KING_SIDE_CASTLE;
+						break;
+					case 'Q':
+						pos.castlingRights |= WHITE_QUEEN_SIDE_CASTLE;
+						break;
+					case 'k':
+						pos.castlingRights |= BLACK_KING_SIDE_CASTLE;
+						break;
+					case 'q':
+						pos.castlingRights |= BLACK_QUEEN_SIDE_CASTLE;
+						break;
+					default:
+						return pos;
+				}
+			}
 		}
 
-		epSquare |= 1ULL << (epRank * 8 + epFile);
-	}
+		pos.epSquare = 0ULL;
+		if (epSqStr != "-") {
+			if (epSqStr.size() != 2) {
+				return pos;
+			}
 
-	// half-move clock
-	try {
+			int epFile = epSqStr[0] - 'a';
+			int epRank = epSqStr[1] - '1';
+
+			if (epFile < 0 || epFile > 7 || epRank < 0 || epRank > 7) {
+				return pos;
+			}
+
+			pos.epSquare = (1ULL << (epRank * 8 + epFile));
+		}
+
 		int value = std::stoi(rule50Str);
-		rule50 = value;
-	} catch (const std::exception &e) {
-		throw std::runtime_error("Invalid FEN: invalid half-move clock");
-	}
+		if (value < 0) {
+			return pos;
+		}
+		pos.rule50 = value;
 
-	// full-move clock ignored
+		success = true;
+		return pos;
+
+	} catch (...) {
+		success = false;
+		return pos;
+	}
 }
 
 bool Position::operator==(const Position &other) const noexcept {

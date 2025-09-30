@@ -182,7 +182,8 @@ void SearchManager::timeControlManager(
 }
 
 void SearchManager::runSearch(const Position &position, const GoLimits &goLimits,
-                              std::chrono::time_point<std::chrono::steady_clock> commandReceiveTP) {
+                              std::chrono::time_point<std::chrono::steady_clock> commandReceiveTP,
+                              std::function<void(Move)> onFinishCallback) {
 	stopSearch();  // stop any ongoing search
 	{
 		std::lock_guard<std::mutex> lock(timeControlMtx);
@@ -193,10 +194,13 @@ void SearchManager::runSearch(const Position &position, const GoLimits &goLimits
 	// start search
 	timerThread = std::thread(&SearchManager::timeControlManager, this, goLimits, commandReceiveTP,
 	                          position.usColor);
-	searchThread = std::thread(&SearchEngine::search, &searchEngine, position, goLimits);
+	searchThread = std::thread([this, position, goLimits, onFinishCallback]() {
+		searchEngine.search(position, goLimits);
+		onFinishCallback(searchEngine.fetchBestMove());  // WARN: is this a race condition?
+	});
 }
 
-Move SearchManager::stopSearch(void) {
+void SearchManager::stopSearch(void) {
 	if (timerThread.joinable()) {
 		{
 			std::lock_guard<std::mutex> lock(timeControlMtx);
@@ -208,8 +212,12 @@ Move SearchManager::stopSearch(void) {
 	if (searchThread.joinable()) {
 		searchEngine.requestedStop.store(true, std::memory_order_relaxed);
 		searchThread.join();
-		return searchEngine.fetchBestMove();
 	}
+}
 
-	return Move();
+void SearchManager::blockUntilDone(void) {
+	if (searchThread.joinable()) {
+		searchThread.join();
+		stopSearch();  // stop the timer and clean any state
+	}
 }
