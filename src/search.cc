@@ -24,41 +24,46 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 		depthLimit = std::min(depthLimit, goLimits.proveMateInN * 2);
 	}
 
-	for (int depth = 1; depth <= depthLimit; depth++) {
-		Score bestSearchScore = -INF;
-		Score alpha = -INF;
-		Score beta = INF;
+	for (int depth = 1; depth <= depthLimit; ++depth) {
+		Score iterBestScore = -INF;
+		Move iterBestMove;
 
 		std::vector<std::pair<Move, Score>> rootScores;
 		rootScores.reserve(legalMoves.size());
 
-		for (Move move : legalMoves) {
+		bool aborted = false;
+
+		for (const Move &move : legalMoves) {
 			if (requestedStop.load(std::memory_order_relaxed)) {
-				return;
+				aborted = true;
+				break;
 			}
 
 			position.makeMove(move);
+			bool childAborted = false;
 			Score childScore = goLimits.nodeLimit > 0
-			                       ? -coreSearch<true>(depth - 1, -beta, -alpha)
-			                       : -coreSearch<false>(depth - 1, -beta, -alpha);
+			                       ? -coreSearch<true>(depth - 1, -INF, INF, childAborted)
+			                       : -coreSearch<false>(depth - 1, -INF, INF, childAborted);
 			position.undoMove();
 
-			if (childScore == -INF) {
-				goto search_end;  // if he haven't searched all children we can't know the true
-				                  // value of this node
+			if (childAborted) {
+				aborted = true;
+				break;
 			}
 
-			if (childScore > bestSearchScore) {
-				bestSearchScore = childScore;
-				bestMove = move;
+			if (childScore > iterBestScore) {
+				iterBestScore = childScore;
+				iterBestMove = move;
 			}
-
-			alpha = std::max<Score>(alpha, childScore);
 			rootScores.emplace_back(move, childScore);
 		}
 
-		// order moves so they can be explored in a better order in the next iteration
-		assert(rootScores.size() == legalMoves.size());
+		if (aborted) {
+			// do not set best move if aborted
+			break;
+		}
+
+		bestMove = iterBestMove;
 
 		std::stable_sort(rootScores.begin(), rootScores.end(),
 		                 [](auto &a, auto &b) { return a.second > b.second; });
@@ -66,56 +71,50 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 			legalMoves[i] = rootScores[i].first;
 		}
 	}
-
-search_end:
-	return;
 }
 
 template <bool HasNodeLimit>
-Score SearchEngine::coreSearch(int depth, Score alpha, Score beta) {
-	// stop on node limit
+Score SearchEngine::coreSearch(int depth, Score alpha, Score beta, bool &searchCancelledOut) {
+	searchCancelledOut = false;
+
 	if constexpr (HasNodeLimit) {
 		if (--nodesRemaining < 0) {
-			return INF;
+			searchCancelledOut = true;
+			return alpha;
 		}
 	}
-
-	// stop on time
 	if (requestedStop.load(std::memory_order_relaxed)) {
-		return INF;
+		searchCancelledOut = true;
+		return alpha;
 	}
 
-	MoveList legalmoves = moveGenerator.generateLegalMoves();
-	const bool isCheckmateOrStalemate = legalmoves.size() == 0;
+	// quick bailout for terminal nodes
+	MoveList legalMoves = moveGenerator.generateLegalMoves();
+	if (legalMoves.size() == 0) {
+		return legalMoves.inCheck() ? MATED_SCORE : 0;
+	}
 
-	// stop on depth
-	// TODO: stop on other terminal conditions besides checkmate and stalemate
 	if (depth == 0) {
-		return isCheckmateOrStalemate ? (legalmoves.inCheck() ? MATED_SCORE : 0) : eval(position);
-	}
-
-	// stop on checkmate or stalemate
-	if (isCheckmateOrStalemate) {
-		return legalmoves.inCheck() ? MATED_SCORE : 0;
+		return eval(position);
 	}
 
 	Score bestScore = -INF;
 
-	for (Move move : legalmoves) {
+	for (const Move &move : legalMoves) {
 		position.makeMove(move);
-		Score childScore = -coreSearch<HasNodeLimit>(depth - 1, -beta, -alpha);
+		bool childCancelled = false;
+		Score childScore = -coreSearch<HasNodeLimit>(depth - 1, -beta, -alpha, childCancelled);
 		position.undoMove();
 
-		if (childScore == -INF) {
-			return INF;  // if he haven't searched all children we can't know the true value of this
-			             // node
+		if (childCancelled) {
+			searchCancelledOut = true;
+			return alpha;
 		}
 
 		bestScore = std::max(bestScore, childScore);
-
-		alpha = std::max<Score>(alpha, childScore);
-		if (alpha >= beta) {
-			break;
+		if (childScore > alpha) {
+			alpha = childScore;
+			if (alpha >= beta) break;
 		}
 	}
 
@@ -129,43 +128,43 @@ SearchManager::~SearchManager(void) { stopSearch(); }
 void SearchManager::timeControlManager(
     const GoLimits &goLimits, std::chrono::time_point<std::chrono::steady_clock> commandReceiveTP,
     int engineColor) {
-	if (goLimits.infinite || goLimits.ponder || goLimits.proveMateInN > 0) {
-		return;  // no timer needed
-	}
+	const bool has_time_controls = goLimits.moveTimeMS > 0 || goLimits.timeLeftMS[0] > 0 ||
+	                               goLimits.timeLeftMS[1] > 0 || goLimits.incMS[0] > 0 ||
+	                               goLimits.incMS[1] > 0;
 
-	auto compute_time_budget_ms = [&](void) -> int64_t {
+	if (!has_time_controls || goLimits.infinite || goLimits.ponder || goLimits.proveMateInN > 0)
+		return;
+
+	const double incUse = 0.65;         // fraction of increment to spend per move
+	const double maxBudgetFrac = 0.25;  // cap per-move spend as fraction of remaining time
+	const int64_t minBudget = 200;
+	const std::chrono::milliseconds safetyReserve(80);  // always keep safety reserve
+	const std::chrono::milliseconds stopSlack(10);
+
+	auto compute_time_budget_ms = [&]() -> int64_t {
 		if (goLimits.moveTimeMS > 0) {
-			return static_cast<int64_t>(goLimits.moveTimeMS);  // fixed time budget
+			return (int64_t)goLimits.moveTimeMS;  // fixed movetime from UCI
 		}
 
 		int64_t myTime = goLimits.timeLeftMS[engineColor];
 		int64_t myInc = goLimits.incMS[engineColor];
 
-		const double incUse = 0.6;
-		const double maxBudgetFrac = 0.20;
-		const int64_t minBudget = 20;
-
 		int64_t budget;
 		if (goLimits.movesToGo > 0) {
-			budget = static_cast<int64_t>(static_cast<double>(myTime) /
-			                              static_cast<double>(goLimits.movesToGo)) +
-			         static_cast<int64_t>(incUse * static_cast<double>(myInc));
+			// spread remaining time across remaining moves + part of increment
+			budget = (myTime / goLimits.movesToGo) + (int64_t)(incUse * (double)myInc);
 		}
 		else {
-			budget = static_cast<int64_t>(0.03 * static_cast<double>(myTime) +
-			                              incUse * static_cast<double>(myInc));
+			budget = (int64_t)(0.01 * (double)myTime + incUse * (double)myInc);
 		}
-		budget = std::min<int64_t>(
-		    budget, static_cast<int64_t>(maxBudgetFrac * static_cast<double>(myTime)));
-		return std::max<int64_t>(budget, minBudget);
+
+		budget = std::min<int64_t>(budget, (int64_t)(maxBudgetFrac * (double)myTime));
+		budget = std::max<int64_t>(budget, minBudget);
+		return budget;
 	};
 
 	int64_t budgetMS = compute_time_budget_ms();
 
-	const std::chrono::milliseconds safetyReserve(30);  // always keep this in the bank
-	const std::chrono::milliseconds stopSlack(5);       // stop a bit sooner
-
-	// don't exceed budget and keep a reserve
 	auto effective = std::chrono::milliseconds(std::max<int64_t>(10, budgetMS)) - safetyReserve;
 	if (effective <= std::chrono::milliseconds(10)) {
 		effective = std::chrono::milliseconds(10);
@@ -196,7 +195,7 @@ void SearchManager::runSearch(const Position &position, const GoLimits &goLimits
 	                          position.usColor);
 	searchThread = std::thread([this, position, goLimits, onFinishCallback]() {
 		searchEngine.search(position, goLimits);
-		onFinishCallback(searchEngine.fetchBestMove());  // WARN: is this a race condition?
+		onFinishCallback(searchEngine.fetchBestMove());
 	});
 }
 

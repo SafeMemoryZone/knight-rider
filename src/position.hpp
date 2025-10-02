@@ -38,8 +38,9 @@ struct Position {
 	uint8_t usColor;
 	uint8_t oppColor;
 
-   private:
 	int ply = 0;
+
+   private:
 	UndoInfo undoStack[MAX_PLY];
 
 	template <int UsColor>

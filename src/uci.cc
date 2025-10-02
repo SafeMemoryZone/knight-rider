@@ -24,7 +24,7 @@ static inline bool advanceIfPossible(const std::vector<std::string>& tokens, siz
 	return true;
 }
 
-static void printBestMove(Move move) { std::cout << "bestmove " << move.toLan() << std::endl; }
+static void printBestMove(Move move) { printSafe("bestmove ", move.toLan()); }
 
 void UciEngine::start(void) {
 	std::string line;
@@ -66,7 +66,7 @@ void UciEngine::start(void) {
 		else if (cmd == "setoption") {
 			// TODO: implement
 			if (isDebugMode) {
-				std::cout << "info string 'setoption' not implemented yet" << std::endl;
+				printSafe("info string 'setoption' not implemented yet");
 			}
 		}
 		else if (cmd == "ucinewgame") {
@@ -81,7 +81,7 @@ void UciEngine::start(void) {
 		else if (cmd == "ponderhit") {
 			// TODO: implement
 			if (isDebugMode) {
-				std::cout << "info string 'ponderhit' not implemented yet" << std::endl;
+				printSafe("info string 'ponderhit' not implemented yet");
 			}
 		}
 		else if (cmd == "stop") {
@@ -94,18 +94,18 @@ void UciEngine::start(void) {
 }
 
 void UciEngine::handleUciCmd(void) {
-	std::cout << "id name Knightrider\n";
-	std::cout << "id author Viliam Holly\n";
-	// TODO: std::cout << "option name Hash type spin default 1 min 1 max 1024\n";
+	printSafe("id name Knightrider");
+	printSafe("id author Viliam Holly");
+	// TODO: hash table size option
 	initBitboards();
-	std::cout << "uciok" << std::endl;
+	printSafe("uciok");
 }
 
 void UciEngine::handleDebugCmd(void) {
 	tokenPos = 1;
 	if (tokenPos >= lowerTokens.size()) {
 		if (isDebugMode) {
-			std::cout << "info string missing argument" << std::endl;
+			printSafe("info string missing argument");
 		}
 		return;
 	}
@@ -118,17 +118,17 @@ void UciEngine::handleDebugCmd(void) {
 	}
 	else {
 		if (isDebugMode) {
-			std::cout << "info string expected 'on' or 'off'" << std::endl;
+			printSafe("info string expected 'on' or 'off'");
 		}
 	}
 }
 
-void UciEngine::handleIsReadyCmd(void) { std::cout << "readyok" << std::endl; }
+void UciEngine::handleIsReadyCmd(void) { printSafe("readyok"); }
 
 void UciEngine::handleUcinewgameCmd(void) {
 	pos = Position();
 	if (isDebugMode) {
-		std::cout << "info string new UCI game initialized" << std::endl;
+		printSafe("info string new UCI game initialized");
 	}
 }
 
@@ -137,7 +137,7 @@ void UciEngine::handlePositionCmd(void) {
 	tokenPos = 1;
 	if (tokenPos >= lowerTokens.size()) {
 		if (isDebugMode) {
-			std::cout << "info string missing argument" << std::endl;
+			printSafe("info string missing argument");
 		}
 		return;
 	}
@@ -148,7 +148,7 @@ void UciEngine::handlePositionCmd(void) {
 
 		if (!advanceIfPossible(lowerTokens, tokenPos)) {
 			if (isDebugMode) {
-				std::cout << "info string position set" << std::endl;
+				printSafe("info string position set");
 			}
 			return;
 		}
@@ -157,7 +157,7 @@ void UciEngine::handlePositionCmd(void) {
 	else if (lowerTokens.at(tokenPos) == "fen") {
 		if (!advanceIfPossible(lowerTokens, tokenPos)) {
 			if (isDebugMode) {
-				std::cout << "info string missing FEN" << std::endl;
+				printSafe("info string missing FEN");
 			}
 			return;
 		}
@@ -171,7 +171,7 @@ void UciEngine::handlePositionCmd(void) {
 
 		if (fenStart == fenEnd) {
 			if (isDebugMode) {
-				std::cout << "info string invalid FEN string" << std::endl;
+				printSafe("info string invalid FEN string");
 			}
 			return;
 		}
@@ -189,7 +189,7 @@ void UciEngine::handlePositionCmd(void) {
 		pos = Position::fromFen(fen, success);
 		if (!success) {
 			if (isDebugMode) {
-				std::cout << "info string invalid FEN string" << std::endl;
+				printSafe("info string invalid FEN string");
 			}
 			return;
 		}
@@ -197,7 +197,7 @@ void UciEngine::handlePositionCmd(void) {
 	}
 	else {
 		if (isDebugMode) {
-			std::cout << "info string expected 'startpos' or 'fen'" << std::endl;
+			printSafe("info string expected 'startpos' or 'fen'");
 		}
 		return;
 	}
@@ -206,7 +206,7 @@ void UciEngine::handlePositionCmd(void) {
 	if (tokenPos < lowerTokens.size() && lowerTokens.at(tokenPos) == "moves") {
 		if (!advanceIfPossible(lowerTokens, tokenPos)) {
 			if (isDebugMode) {
-				std::cout << "info string position set" << std::endl;
+				printSafe("info string position set");
 			}
 			return;
 		}
@@ -226,7 +226,7 @@ void UciEngine::handlePositionCmd(void) {
 			}
 
 			if (!applied && isDebugMode) {
-				std::cout << "info string illegal or unknown move: " << lan << std::endl;
+				printSafe("info string illegal or unknown move: ", lan);
 			}
 
 			tokenPos++;
@@ -234,7 +234,7 @@ void UciEngine::handlePositionCmd(void) {
 	}
 
 	if (isDebugMode) {
-		std::cout << "info string position set" << std::endl;
+		printSafe("info string position set");
 	}
 }
 
@@ -301,8 +301,7 @@ void UciEngine::handleGoCmd(void) {
 			while (tokenPos < lowerTokens.size() && !isKeyword(lowerTokens[tokenPos])) {
 				const std::string& mvTxt = tokens[tokenPos];
 				if (!addSearchMove(mvTxt) && isDebugMode) {
-					std::cout << "info string ignoring unknown searchmove '" << mvTxt << "'"
-					          << std::endl;
+					printSafe("info string ignoring unknown searchmove '", mvTxt, "'");
 				}
 				tokenPos++;
 			}
@@ -312,46 +311,46 @@ void UciEngine::handleGoCmd(void) {
 		}
 		else if (kw == "wtime") {
 			if (!parseI64(limits.timeLeftMS[0]) && isDebugMode)
-				std::cout << "info string missing/invalid wtime value" << std::endl;
+				printSafe("info string missing/invalid wtime value");
 		}
 		else if (kw == "btime") {
 			if (!parseI64(limits.timeLeftMS[1]) && isDebugMode)
-				std::cout << "info string missing/invalid btime value" << std::endl;
+				printSafe("info string missing/invalid btime value");
 		}
 		else if (kw == "winc") {
 			if (!parseI32(limits.incMS[0]) && isDebugMode)
-				std::cout << "info string missing/invalid winc value" << std::endl;
+				printSafe("info string missing/invalid winc value");
 		}
 		else if (kw == "binc") {
 			if (!parseI32(limits.incMS[1]) && isDebugMode)
-				std::cout << "info string missing/invalid binc value" << std::endl;
+				printSafe("info string missing/invalid binc value");
 		}
 		else if (kw == "movestogo") {
 			if (!parseI32(limits.movesToGo) && isDebugMode)
-				std::cout << "info string missing/invalid movestogo value" << std::endl;
+				printSafe("info string missing/invalid movestogo value");
 		}
 		else if (kw == "depth") {
 			if (!parseI32(limits.depthLimit) && isDebugMode)
-				std::cout << "info string missing/invalid depth value" << std::endl;
+				printSafe("info string missing/invalid depth value");
 		}
 		else if (kw == "nodes") {
 			if (!parseI64(limits.nodeLimit) && isDebugMode)
-				std::cout << "info string missing/invalid nodes value" << std::endl;
+				printSafe("info string missing/invalid nodes value");
 		}
 		else if (kw == "mate") {
 			if (!parseI32(limits.proveMateInN) && isDebugMode)
-				std::cout << "info string missing/invalid mate value" << std::endl;
+				printSafe("info string missing/invalid mate value");
 		}
 		else if (kw == "movetime") {
 			if (!parseI32(limits.moveTimeMS) && isDebugMode)
-				std::cout << "info string missing/invalid movetime value" << std::endl;
+				printSafe("info string missing/invalid movetime value");
 		}
 		else if (kw == "infinite") {
 			limits.infinite = true;
 		}
 		else {
 			if (isDebugMode) {
-				std::cout << "info string unknown go-token '" << kw << "'" << std::endl;
+				printSafe("info string unknown go-token '");
 			}
 			return;
 		}

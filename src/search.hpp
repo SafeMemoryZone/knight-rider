@@ -30,7 +30,7 @@ class SearchEngine {
 	void search(const Position& searchPosition, const GoLimits& goLimits);
 
 	template <bool HasNodeLimit>
-	Score coreSearch(int depth, Score alpha, Score beta);
+	Score coreSearch(int depth, Score alpha, Score beta, bool& searchCancelledOut);
 
 	Move fetchBestMove(void) const;
 

@@ -2,7 +2,9 @@
 #define TYPES_HPP
 
 #include <cstdint>
+#include <iostream>
 #include <limits>
+#include <mutex>
 
 // types
 using Bitboard = uint64_t;
@@ -30,5 +32,14 @@ constexpr Score INF = std::numeric_limits<int32_t>::max();
 
 constexpr int MAX_PLY = 256;
 constexpr int MAX_MOVES = 256;
+
+// safe printing
+extern std::mutex printMutex;
+
+template <typename... Args>
+inline void printSafe(Args&&... args) {
+	std::lock_guard<std::mutex> guard(printMutex);
+	(std::cout << ... << args) << std::endl;
+}
 
 #endif  // TYPES_HPP
