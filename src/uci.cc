@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "bitboards.hpp"
+#include "perft.hpp"
 
 static std::vector<std::string> tokenizeLine(const std::string& line) {
 	std::istringstream iss(line);
@@ -27,6 +28,8 @@ static inline bool advanceIfPossible(const std::vector<std::string>& tokens, siz
 static void printBestMove(Move move) { printSafe("bestmove ", move.toLan()); }
 
 void UciEngine::start(void) {
+	initBitboards();
+
 	std::string line;
 
 	for (;;) {
@@ -88,6 +91,7 @@ void UciEngine::start(void) {
 			handleStopCmd();
 		}
 		else if (cmd == "quit") {
+			searchManager.stopSearch();
 			return;
 		}
 	}
@@ -97,7 +101,6 @@ void UciEngine::handleUciCmd(void) {
 	printSafe("id name Knightrider");
 	printSafe("id author Viliam Holly");
 	// TODO: hash table size option
-	initBitboards();
 	printSafe("uciok");
 }
 
@@ -294,6 +297,9 @@ void UciEngine::handleGoCmd(void) {
 		return false;
 	};
 
+	bool isPerft = false;
+	int perftDepth = 0;
+
 	while (tokenPos < lowerTokens.size()) {
 		const std::string& kw = lowerTokens[tokenPos++];
 		if (kw == "searchmoves") {
@@ -348,15 +354,29 @@ void UciEngine::handleGoCmd(void) {
 		else if (kw == "infinite") {
 			limits.infinite = true;
 		}
+		else if (kw == "perft") {
+			if (!parseI32(perftDepth) && isDebugMode) printSafe("info string depth parameter");
+			isPerft = true;
+		}
 		else {
 			if (isDebugMode) {
-				printSafe("info string unknown go-token '");
+				printSafe("info string unknown go-token '", kw, "'");
 			}
 			return;
 		}
 	}
 
-	searchManager.runSearch(pos, limits, recvTP, printBestMove);
+	if (isPerft) {
+		auto startTime = std::chrono::high_resolution_clock::now();
+		size_t nodes = perft(pos, perftDepth, true);
+		auto endTime = std::chrono::high_resolution_clock::now();
+		std::chrono::duration<double> elapsedTime = endTime - startTime;
+
+		std::cout << "Nodes searched: " << nodes << " in " << elapsedTime << std::endl;
+	}
+	else {
+		searchManager.runSearch(pos, limits, recvTP, printBestMove);
+	}
 }
 
 void UciEngine::handleStopCmd(void) { searchManager.stopSearch(); }

@@ -8,8 +8,6 @@
 static Position position;
 static MoveGenerator moveGenerator = MoveGenerator(&position);
 
-void initPerft(const Position &pos) { position = pos; }
-
 template <bool PrintPerftLine>
 static size_t perftT(int depth) {
 	size_t nodes = 0;
@@ -36,7 +34,8 @@ static size_t perftT(int depth) {
 }
 
 // wrapper for perfT
-size_t perft(int depth, bool printPerftLine) {
+size_t perft(const Position &pos, int depth, bool printPerftLine) {
+	position = pos;
 	if (printPerftLine) {
 		return perftT<true>(depth);
 	}
