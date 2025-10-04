@@ -13,6 +13,7 @@
 #include "movegen.hpp"
 #include "movelist.hpp"
 #include "position.hpp"
+#include "tt.hpp"
 
 // search limits & options
 struct GoLimits {
@@ -28,20 +29,21 @@ class SearchEngine {
    public:
 	SearchEngine(void) = default;
 
-	void search(const Position& searchPosition, const GoLimits& goLimits);
+        void search(const Position& searchPosition, const GoLimits& goLimits, TranspositionTable* ttPtr);
 
-	template <bool HasNodeLimit>
-	Score coreSearch(int depth, Score alpha, Score beta, bool& searchCancelledOut);
+        template <bool HasNodeLimit>
+        Score coreSearch(int depth, Score alpha, Score beta, bool& searchCancelledOut);
 
 	Move fetchBestMove(void) const;
 
 	std::atomic<bool> requestedStop;
 
    private:
-	Move bestMove;
-	Position position;
-	int64_t nodesRemaining;  // used only when a node limit is set
-	MoveGenerator moveGenerator = MoveGenerator(&position);
+        Move bestMove;
+        Position position;
+        int64_t nodesRemaining;  // used only when a node limit is set
+        MoveGenerator moveGenerator = MoveGenerator(&position);
+        TranspositionTable* tt = nullptr;
 };
 
 // manager for running search + time control
@@ -50,9 +52,9 @@ class SearchManager {
 	SearchManager(void) = default;
 	~SearchManager(void);
 
-	void runSearch(const Position& searchPosition, const GoLimits& goLimits,
-	               std::chrono::time_point<std::chrono::steady_clock> commandReceiveT,
-	               std::function<void(Move)> onFinishCallbackP);
+        void runSearch(const Position& searchPosition, const GoLimits& goLimits,
+                       std::chrono::time_point<std::chrono::steady_clock> commandReceiveT,
+                       std::function<void(Move)> onFinishCallbackP, TranspositionTable* ttPtr);
 
 	void stopSearch(void);      // returns best move
 	void blockUntilDone(void);  // wait for completion and return best move

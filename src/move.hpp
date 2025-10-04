@@ -9,15 +9,16 @@
 
 class Move {
    public:
-	Move(void) = default;
-	inline Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
+        Move(void) = default;
+        inline Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
 
-	inline bool isNull(void) const;
+        inline bool isNull(void) const;
+        inline bool operator==(const Move& other) const;
 
-	inline std::string toLan(void) const;
-	inline Bitboard getFrom(void) const;
-	inline Bitboard getTo(void) const;
-	inline int getMovingPt(void) const;
+        inline std::string toLan(void) const;
+        inline Bitboard getFrom(void) const;
+        inline Bitboard getTo(void) const;
+        inline int getMovingPt(void) const;
 	inline int getPromoPt(void) const;
 	inline bool getIsCastling(void) const;
 	inline bool getIsEp(void) const;
@@ -37,9 +38,9 @@ inline Move::Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool is
 }
 
 inline std::string Move::toLan(void) const {
-	if (!move) {
-		return "0000";  // null move
-	}
+        if (!move) {
+                return "0000";  // null move
+        }
 
 	int fromSq = move & 0x3F;
 	int toSq = (move >> 6) & 0x3F;
@@ -66,6 +67,8 @@ inline std::string Move::toLan(void) const {
 }
 
 inline bool Move::isNull(void) const { return move == 0; }
+
+inline bool Move::operator==(const Move& other) const { return move == other.move; }
 
 inline Bitboard Move::getFrom(void) const { return 1ULL << (move & 0x3F); }
 inline Bitboard Move::getTo(void) const { return 1ULL << ((move >> 6) & 0x3F); }
