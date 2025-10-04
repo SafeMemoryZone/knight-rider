@@ -41,7 +41,16 @@ Position::Position(void)
 Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 	success = false;
 
-	Position pos{};
+	Position pos;
+
+	// reset to empty
+	for (int i = 0; i < 12; ++i) pos.pieces[i] = 0ULL;
+	pos.occForColor[0] = pos.occForColor[1] = 0ULL;
+	pos.epSquare = 0ULL;
+	pos.rule50 = 0;
+	pos.castlingRights = 0;
+	pos.usColor = WHITE;
+	pos.oppColor = BLACK;
 
 	try {
 		std::istringstream stream(fen);
@@ -91,7 +100,7 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 
 		if (rank != 0 || file != 8) return pos;
 
-                // occupancy
+		// occupancy
 		pos.occForColor[0] = 0;
 		pos.occForColor[1] = 0;
 		for (int color = 0; color < 2; ++color) {
@@ -282,138 +291,138 @@ void Position::undoMove(void) {
 
 template <int UsColor>
 void Position::makeMoveT(Move move) {
-        constexpr int OppColor = UsColor ^ 1;
+	constexpr int OppColor = UsColor ^ 1;
 
-        UndoInfo &u = undoStack[ply++];
-        u.move = move;
-        u.castlingRights = castlingRights;
-        u.epSquare = epSquare;
-        u.halfmoveClock = rule50;
-        u.hash = hash;
+	UndoInfo &u = undoStack[ply++];
+	u.move = move;
+	u.castlingRights = castlingRights;
+	u.epSquare = epSquare;
+	u.halfmoveClock = rule50;
+	u.hash = hash;
 
-        Bitboard from = move.getFrom();
-        Bitboard to = move.getTo();
-        int movingPt = move.getMovingPt();
-        int promoPt = move.getPromoPt();
-        bool isEp = move.getIsEp();
-        bool isCastling = move.getIsCastling();
+	Bitboard from = move.getFrom();
+	Bitboard to = move.getTo();
+	int movingPt = move.getMovingPt();
+	int promoPt = move.getPromoPt();
+	bool isEp = move.getIsEp();
+	bool isCastling = move.getIsCastling();
 
-        int fromSq = std::countr_zero(from);
-        int toSq = std::countr_zero(to);
+	int fromSq = std::countr_zero(from);
+	int toSq = std::countr_zero(to);
 
-        if (epSquare) {
-                int epFile = std::countr_zero(epSquare) & 7;
-                hash ^= Z_EP_FILE[epFile];
-        }
+	if (epSquare) {
+		int epFile = std::countr_zero(epSquare) & 7;
+		hash ^= Z_EP_FILE[epFile];
+	}
 
-        hash ^= Z_CASTLING[castlingRights];
+	hash ^= Z_CASTLING[castlingRights];
 
-        int capturedType = PT_NULL;
-        if (isEp) {
-                Bitboard capSquare;
-                if constexpr (UsColor == WHITE) {
-                        capSquare = to >> 8;
-                }
-                else {
-                        capSquare = to << 8;
-                }
-                // find the pawn on that square
-                capturedType = PT_PAWN;
-                pieces[OppColor * 6 + PT_PAWN] ^= capSquare;
-                occForColor[OppColor] ^= capSquare;
+	int capturedType = PT_NULL;
+	if (isEp) {
+		Bitboard capSquare;
+		if constexpr (UsColor == WHITE) {
+			capSquare = to >> 8;
+		}
+		else {
+			capSquare = to << 8;
+		}
+		// find the pawn on that square
+		capturedType = PT_PAWN;
+		pieces[OppColor * 6 + PT_PAWN] ^= capSquare;
+		occForColor[OppColor] ^= capSquare;
 
-                int capSq = std::countr_zero(capSquare);
-                hash ^= Z_PSQ[OppColor * 6 + PT_PAWN][capSq];
-        }
-        else {
-                // normal capture
-                Bitboard hit = to & occForColor[OppColor];
-                if (hit) {
+		int capSq = std::countr_zero(capSquare);
+		hash ^= Z_PSQ[OppColor * 6 + PT_PAWN][capSq];
+	}
+	else {
+		// normal capture
+		Bitboard hit = to & occForColor[OppColor];
+		if (hit) {
 			// find which piece type
-                        for (int pt = 0; pt < 6; ++pt) {
-                                if (pieces[OppColor * 6 + pt] & hit) {
-                                        capturedType = pt;
-                                        pieces[OppColor * 6 + pt] ^= hit;
-                                        occForColor[OppColor] ^= hit;
+			for (int pt = 0; pt < 6; ++pt) {
+				if (pieces[OppColor * 6 + pt] & hit) {
+					capturedType = pt;
+					pieces[OppColor * 6 + pt] ^= hit;
+					occForColor[OppColor] ^= hit;
 
-                                        int capSq = std::countr_zero(hit);
-                                        hash ^= Z_PSQ[OppColor * 6 + pt][capSq];
-                                        break;
-                                }
-                        }
-                }
-        }
-        u.capturedType = (uint8_t)capturedType;
+					int capSq = std::countr_zero(hit);
+					hash ^= Z_PSQ[OppColor * 6 + pt][capSq];
+					break;
+				}
+			}
+		}
+	}
+	u.capturedType = (uint8_t)capturedType;
 
-        // move the actual piece
-        int base = UsColor * 6 + movingPt;
-        pieces[base] ^= (from | to);
-        occForColor[UsColor] ^= (from | to);
+	// move the actual piece
+	int base = UsColor * 6 + movingPt;
+	pieces[base] ^= (from | to);
+	occForColor[UsColor] ^= (from | to);
 
-        hash ^= Z_PSQ[base][fromSq];
+	hash ^= Z_PSQ[base][fromSq];
 
-        // promotions
-        if (promoPt != PT_NULL) {
-                pieces[base] ^= to;
-                pieces[UsColor * 6 + promoPt] ^= to;
+	// promotions
+	if (promoPt != PT_NULL) {
+		pieces[base] ^= to;
+		pieces[UsColor * 6 + promoPt] ^= to;
 
-                hash ^= Z_PSQ[UsColor * 6 + promoPt][toSq];
-        }
-        else {
-                hash ^= Z_PSQ[base][toSq];
-        }
+		hash ^= Z_PSQ[UsColor * 6 + promoPt][toSq];
+	}
+	else {
+		hash ^= Z_PSQ[base][toSq];
+	}
 
-        // move rook when castling
-        if (isCastling) {
-                if constexpr (UsColor == WHITE) {
-                        // white to move
-                        if (to == G1) {
-                                // king side: rook H1 -> F1
-                                pieces[PT_ROOK] ^= H1 | F1;
-                                occForColor[UsColor] ^= H1 | F1;
+	// move rook when castling
+	if (isCastling) {
+		if constexpr (UsColor == WHITE) {
+			// white to move
+			if (to == G1) {
+				// king side: rook H1 -> F1
+				pieces[PT_ROOK] ^= H1 | F1;
+				occForColor[UsColor] ^= H1 | F1;
 
-                                int rookFrom = std::countr_zero(H1);
-                                int rookTo = std::countr_zero(F1);
-                                hash ^= Z_PSQ[PT_ROOK][rookFrom];
-                                hash ^= Z_PSQ[PT_ROOK][rookTo];
-                        }
-                        else {
-                                // queen side: rook A1 -> D1
-                                pieces[PT_ROOK] ^= A1 | D1;
-                                occForColor[UsColor] ^= A1 | D1;
+				int rookFrom = std::countr_zero(H1);
+				int rookTo = std::countr_zero(F1);
+				hash ^= Z_PSQ[PT_ROOK][rookFrom];
+				hash ^= Z_PSQ[PT_ROOK][rookTo];
+			}
+			else {
+				// queen side: rook A1 -> D1
+				pieces[PT_ROOK] ^= A1 | D1;
+				occForColor[UsColor] ^= A1 | D1;
 
-                                int rookFrom = std::countr_zero(A1);
-                                int rookTo = std::countr_zero(D1);
-                                hash ^= Z_PSQ[PT_ROOK][rookFrom];
-                                hash ^= Z_PSQ[PT_ROOK][rookTo];
-                        }
-                }
-                else {
-                        // black to move
-                        if (to == G8) {
-                                // king side: rook H8 -> F8
-                                pieces[6 + PT_ROOK] ^= H8 | F8;
-                                occForColor[UsColor] ^= H8 | F8;
+				int rookFrom = std::countr_zero(A1);
+				int rookTo = std::countr_zero(D1);
+				hash ^= Z_PSQ[PT_ROOK][rookFrom];
+				hash ^= Z_PSQ[PT_ROOK][rookTo];
+			}
+		}
+		else {
+			// black to move
+			if (to == G8) {
+				// king side: rook H8 -> F8
+				pieces[6 + PT_ROOK] ^= H8 | F8;
+				occForColor[UsColor] ^= H8 | F8;
 
-                                int rookFrom = std::countr_zero(H8);
-                                int rookTo = std::countr_zero(F8);
-                                hash ^= Z_PSQ[6 + PT_ROOK][rookFrom];
-                                hash ^= Z_PSQ[6 + PT_ROOK][rookTo];
-                        }
-                        else {
-                                // queen side: rook A8 -> D8
-                                pieces[6 + PT_ROOK] ^= A8 | D8;
-                                occForColor[UsColor] ^= A8 | D8;
+				int rookFrom = std::countr_zero(H8);
+				int rookTo = std::countr_zero(F8);
+				hash ^= Z_PSQ[6 + PT_ROOK][rookFrom];
+				hash ^= Z_PSQ[6 + PT_ROOK][rookTo];
+			}
+			else {
+				// queen side: rook A8 -> D8
+				pieces[6 + PT_ROOK] ^= A8 | D8;
+				occForColor[UsColor] ^= A8 | D8;
 
-                                int rookFrom = std::countr_zero(A8);
-                                int rookTo = std::countr_zero(D8);
-                                hash ^= Z_PSQ[6 + PT_ROOK][rookFrom];
-                                hash ^= Z_PSQ[6 + PT_ROOK][rookTo];
-                        }
-                }
-        }
+				int rookFrom = std::countr_zero(A8);
+				int rookTo = std::countr_zero(D8);
+				hash ^= Z_PSQ[6 + PT_ROOK][rookFrom];
+				hash ^= Z_PSQ[6 + PT_ROOK][rookTo];
+			}
+		}
+	}
 
-        // update ep square
+	// update ep square
 	// white double-push
 	if (movingPt == PT_PAWN && (from & RANK_2) && (to & RANK_4)) {
 		epSquare = to >> 8;
@@ -421,20 +430,19 @@ void Position::makeMoveT(Move move) {
 	// black double-push
 	else if (movingPt == PT_PAWN && (from & RANK_7) && (to & RANK_5)) {
 		epSquare = to << 8;
-        }
-        else {
-                epSquare = 0;
-        }
+	}
+	else {
+		epSquare = 0;
+	}
 
-        if (epSquare) {
-                int epFile = std::countr_zero(epSquare) & 7;
-                hash ^= Z_EP_FILE[epFile];
-        }
+	if (epSquare) {
+		int epFile = std::countr_zero(epSquare) & 7;
+		hash ^= Z_EP_FILE[epFile];
+	}
 
-        // update castling rights
-        // case 1: rook moved or captured (cheap implementation, may zero-out castling rights even
-        // though they already are)
-        if (from == H1 || to == H1) {
+	// update castling rights
+	// case 1: rook moved
+	if (from == H1 || to == H1) {
 		castlingRights &= ~1;
 	}
 	else if (from == A1 || to == A1) {
@@ -447,29 +455,29 @@ void Position::makeMoveT(Move move) {
 		castlingRights &= ~8;
 	}
 	// case 2: king moved
-        if (movingPt == PT_KING) {
-                if constexpr (UsColor == WHITE) {
-                        castlingRights &= 0b1100;
-                }
-                else {
-                        castlingRights &= 0b0011;
-                }
-        }
+	if (movingPt == PT_KING) {
+		if constexpr (UsColor == WHITE) {
+			castlingRights &= 0b1100;
+		}
+		else {
+			castlingRights &= 0b0011;
+		}
+	}
 
-        hash ^= Z_CASTLING[castlingRights];
+	hash ^= Z_CASTLING[castlingRights];
 
-        // update 50-move rule counter
-        if (movingPt == PT_PAWN || capturedType != PT_NULL) {
-                rule50 = 0;
-        }
-        else {
-                rule50++;
-        }
+	// update 50-move rule counter
+	if (movingPt == PT_PAWN || capturedType != PT_NULL) {
+		rule50 = 0;
+	}
+	else {
+		rule50++;
+	}
 
-        // switch side to move
-        usColor ^= 1;
-        oppColor ^= 1;
-        hash ^= Z_BLACK_TO_MOVE;
+	// switch side to move
+	usColor ^= 1;
+	oppColor ^= 1;
+	hash ^= Z_BLACK_TO_MOVE;
 }
 
 template <int UsColor>
@@ -478,7 +486,7 @@ void Position::undoMoveT() {
 	epSquare = u.epSquare;
 	rule50 = u.halfmoveClock;
 	castlingRights = u.castlingRights;
-    hash = u.hash;
+	hash = u.hash;
 
 	usColor ^= 1;
 	oppColor ^= 1;

@@ -359,7 +359,8 @@ void UciEngine::handleGoCmd(void) {
 			limits.infinite = true;
 		}
 		else if (kw == "perft") {
-			if (!parseI32(perftDepth) && isDebugMode) printSafe("info string depth parameter");
+			if (!parseI32(perftDepth) && isDebugMode)
+				printSafe("info string missing depth parameter");
 			isPerft = true;
 		}
 		else {
