@@ -22,6 +22,7 @@ class TranspositionTable {
 	TranspositionTable(void) = default;
     ~TranspositionTable(void);
 
+    void clear(void);
 	void newSearch(void);
 	void resize(size_t mb);
 	bool probe(uint64_t key, TTEntry& out) const;

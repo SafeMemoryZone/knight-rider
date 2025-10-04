@@ -1,6 +1,7 @@
 #include "uci.hpp"
 
 #include <cctype>
+#include <chrono>
 #include <iostream>
 #include <sstream>
 #include <string>
@@ -9,11 +10,6 @@
 #include "bitboards.hpp"
 #include "perft.hpp"
 #include "zobrist.hpp"
-
-static void preUciInit(void) {
-	initBitboards();
-	initZobristTables();
-}
 
 static std::vector<std::string> tokenizeLine(const std::string& line) {
 	std::istringstream iss(line);
@@ -32,6 +28,12 @@ static inline bool advanceIfPossible(const std::vector<std::string>& tokens, siz
 }
 
 static void printBestMove(Move move) { printSafe("bestmove ", move.toLan()); }
+
+void UciEngine::preUciInit(void) {
+	initBitboards();
+	initZobristTables();
+	tt.resize(10);  // 10mib default size
+}
 
 void UciEngine::start(void) {
 	preUciInit();
@@ -73,10 +75,7 @@ void UciEngine::start(void) {
 			handleIsReadyCmd();
 		}
 		else if (cmd == "setoption") {
-			// TODO: implement
-			if (isDebugMode) {
-				printSafe("info string 'setoption' not implemented yet");
-			}
+			handleSetoptionCmd();
 		}
 		else if (cmd == "ucinewgame") {
 			handleUcinewgameCmd();
@@ -106,7 +105,8 @@ void UciEngine::start(void) {
 void UciEngine::handleUciCmd(void) {
 	printSafe("id name Knightrider");
 	printSafe("id author Viliam Holly");
-	// TODO: hash table size option
+	printSafe("option name Hash type spin default 10 min 1 max 131072");
+	printSafe("option name Clear Hash type button");
 	printSafe("uciok");
 }
 
@@ -377,7 +377,7 @@ void UciEngine::handleGoCmd(void) {
 		auto endTime = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> elapsedTime = endTime - startTime;
 
-		std::cout << "\nNodes searched: " << nodes << " in " << elapsedTime << std::endl;
+		std::cout << "\nNodes searched: " << nodes << " in " << elapsedTime << '\n' << std::endl;
 	}
 	else {
 		searchManager.runSearch(pos, limits, recvTP, printBestMove);
@@ -385,3 +385,73 @@ void UciEngine::handleGoCmd(void) {
 }
 
 void UciEngine::handleStopCmd(void) { searchManager.stopSearch(); }
+
+void UciEngine::handleSetoptionCmd(void) {
+	// setoption name <id> [value <x>]
+	tokenPos = 1;
+	if (tokenPos >= lowerTokens.size() || lowerTokens[tokenPos] != "name") {
+		if (isDebugMode) {
+			printSafe("info string setoption: expected 'name'");
+		}
+		return;
+	}
+	tokenPos++;
+
+	std::string name, lname;
+	while (tokenPos < tokens.size() && lowerTokens[tokenPos] != "value") {
+		if (!name.empty()) {
+			name.push_back(' ');
+			lname.push_back(' ');
+		}
+		name += tokens[tokenPos];
+		lname += lowerTokens[tokenPos];
+		tokenPos++;
+	}
+
+	// optional value
+	std::string value;
+	if (tokenPos < tokens.size() && lowerTokens[tokenPos] == "value") {
+		tokenPos++;
+		// collect the rest as value
+		while (tokenPos < tokens.size()) {
+			if (!value.empty()) value.push_back(' ');
+			value += tokens[tokenPos++];
+		}
+	}
+
+	// known options
+	if (lname == "hash") {
+		if (value.empty()) {
+			if (isDebugMode) {
+				printSafe("info string setoption Hash: missing value");
+			}
+			return;
+		}
+		try {
+			long long mib = std::stoll(value);
+			if (mib < 1) mib = 1;
+			if (mib > 131072) mib = 131072;
+
+			tt.resize(static_cast<std::size_t>(mib));
+
+			if (isDebugMode) {
+				printSafe("info string TT resized to ", std::to_string(mib), " MiB");
+			}
+		} catch (...) {
+			if (isDebugMode) {
+				printSafe("info string setoption Hash: invalid value '", value, "'");
+			}
+		}
+	}
+	else if (lname == "clear hash") {
+		tt.clear();
+		if (isDebugMode) {
+			printSafe("info string TT cleared");
+		}
+	}
+	else {
+		if (isDebugMode) {
+			printSafe("info string setoption: unknown option '", name, "'");
+		}
+	}
+}

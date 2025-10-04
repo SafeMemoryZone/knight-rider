@@ -1,6 +1,8 @@
 #include "search.hpp"
 
+#include <algorithm>
 #include <cassert>
+#include <vector>
 
 #include "eval.hpp"
 

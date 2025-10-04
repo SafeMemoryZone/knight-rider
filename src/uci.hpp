@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "search.hpp"
+#include "tt.hpp"
 
 class UciEngine {
    public:
@@ -13,6 +14,8 @@ class UciEngine {
 	void start(void);
 
    private:
+	void preUciInit(void);
+
 	void handleUciCmd(void);
 	void handleDebugCmd(void);
 	void handleIsReadyCmd(void);
@@ -20,6 +23,7 @@ class UciEngine {
 	void handlePositionCmd(void);
 	void handleGoCmd(void);
 	void handleStopCmd(void);
+    void handleSetoptionCmd(void);
 
 	// token buffers
 	std::vector<std::string> tokens;
@@ -29,8 +33,9 @@ class UciEngine {
 	size_t tokenPos = 0;
 
 	// engine state
+	TranspositionTable tt;
 	Position pos;
-	MoveGenerator gen = MoveGenerator(&pos);  // move generator bound to pos
+	MoveGenerator gen = MoveGenerator(&pos);  // move generator bound to pos (for verifying moves)
 	bool isDebugMode = false;
 
 	// search

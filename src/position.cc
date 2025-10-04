@@ -4,6 +4,7 @@
 #include <cctype>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 #include "bitboards.hpp"
 #include "misc.hpp"

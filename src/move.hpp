@@ -1,6 +1,7 @@
 #ifndef MOVE_HPP
 #define MOVE_HPP
 
+#include <bit>
 #include <cstdint>
 #include <string>
 
