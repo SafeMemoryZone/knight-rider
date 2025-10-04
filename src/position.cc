@@ -89,7 +89,7 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 
 		if (rank != 0 || file != 8) return pos;
 
-		// occupany
+                // occupancy
 		pos.occForColor[0] = 0;
 		pos.occForColor[1] = 0;
 		for (int color = 0; color < 2; ++color) {

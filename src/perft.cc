@@ -33,7 +33,7 @@ static size_t perftT(int depth) {
 	return nodes;
 }
 
-// wrapper for perfT
+// wrapper for perft
 size_t perft(const Position &pos, int depth, bool printPerftLine) {
 	position = pos;
 	if (printPerftLine) {
