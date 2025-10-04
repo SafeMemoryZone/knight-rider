@@ -6,67 +6,59 @@
 
 #include "eval.hpp"
 
-namespace {
-
 constexpr Score NEG_MATE_THRESHOLD = MATED_SCORE + MAX_PLY;
 constexpr Score POS_MATE_THRESHOLD = -MATED_SCORE - MAX_PLY;
 
-inline Score scoreToTT(Score score, int ply) {
-        if (score <= NEG_MATE_THRESHOLD) {
-                return score - ply;
-        }
-        if (score >= POS_MATE_THRESHOLD) {
-                return score + ply;
-        }
-        return score;
+static inline Score scoreToTT(Score score, int ply) {
+	if (score <= NEG_MATE_THRESHOLD) {
+		return score - ply;
+	}
+	if (score >= POS_MATE_THRESHOLD) {
+		return score + ply;
+	}
+	return score;
 }
 
-inline Score scoreFromTT(Score score, int ply) {
-        if (score <= NEG_MATE_THRESHOLD) {
-                return score + ply;
-        }
-        if (score >= POS_MATE_THRESHOLD) {
-                return score - ply;
-        }
-        return score;
+static inline Score scoreFromTT(Score score, int ply) {
+	if (score <= NEG_MATE_THRESHOLD) {
+		return score + ply;
+	}
+	if (score >= POS_MATE_THRESHOLD) {
+		return score - ply;
+	}
+	return score;
 }
-
-}  // namespace
 
 void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimits,
                           TranspositionTable *ttPtr) {
-        position = searchPosition;
-        position.resetPly();  // no matter the state, start from ply 0
-        nodesRemaining = goLimits.nodeLimit;
-        bestMove = Move();
-        tt = ttPtr;
+	position = searchPosition;
+	position.resetPly();  // no matter the state, start from ply 0
+	nodesRemaining = goLimits.nodeLimit;
+	bestMove = Move();
+	tt = ttPtr;
+	tt->newSearch();
 
-        if (tt) {
-                tt->newSearch();
-        }
+	MoveList legalMoves =
+	    goLimits.searchMoves.size() > 0 ? goLimits.searchMoves : moveGenerator.generateLegalMoves();
 
-        MoveList legalMoves =
-            goLimits.searchMoves.size() > 0 ? goLimits.searchMoves : moveGenerator.generateLegalMoves();
-
-        if (tt && legalMoves.size() > 0) {
-                TTEntry entry;
-                if (tt->probe(position.hash, entry) && !entry.bestMove.isNull()) {
-                        for (size_t i = 0; i < legalMoves.size(); ++i) {
-                                if (legalMoves[i] == entry.bestMove) {
-                                        if (i != 0) {
-                                                Move tmp = legalMoves[0];
-                                                legalMoves[0] = legalMoves[i];
-                                                legalMoves[i] = tmp;
-                                        }
-                                        break;
-                                }
-                        }
-                }
-        }
-
-	// no legal move
+	// no legal moves
 	if (legalMoves.size() == 0) {
 		return;
+	}
+
+	// put tt entry in the front
+	TTEntry entry;
+	if (tt->probe(position.hash, entry) && !entry.bestMove.isNull()) {
+		for (size_t i = 0; i < legalMoves.size(); i++) {
+			if (legalMoves[i] == entry.bestMove) {
+				if (i != 0) {
+					Move tmp = legalMoves[0];
+					legalMoves[0] = legalMoves[i];
+					legalMoves[i] = tmp;
+				}
+				break;
+			}
+		}
 	}
 
 	int depthLimit = goLimits.depthLimit > 0 ? std::min(MAX_PLY, goLimits.depthLimit) : MAX_PLY;
@@ -84,12 +76,12 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 
 		bool aborted = false;
 
-                for (const Move &move : legalMoves) {
-                        if (requestedStop.load(std::memory_order_relaxed)) {
-                                break;
-                        }
+		for (const Move &move : legalMoves) {
+			if (requestedStop.load(std::memory_order_relaxed)) {
+				break;
+			}
 
-                        position.makeMove(move);
+			position.makeMove(move);
 			bool childAborted = false;
 			Score childScore = goLimits.nodeLimit > 0
 			                       ? -coreSearch<true>(depth - 1, -INF, INF, childAborted)
@@ -114,138 +106,134 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 			bestMove = iterBestMove;
 		}
 
-                if (aborted) {
-                        break;
-                }
+		if (aborted) {
+			break;
+		}
 
-                std::stable_sort(rootScores.begin(), rootScores.end(),
-                                 [](auto &a, auto &b) { return a.second > b.second; });
-                for (size_t i = 0; i < rootScores.size(); ++i) {
-                        legalMoves[i] = rootScores[i].first;
-                }
+		std::stable_sort(rootScores.begin(), rootScores.end(),
+		                 [](auto &a, auto &b) { return a.second > b.second; });
+		for (size_t i = 0; i < rootScores.size(); ++i) {
+			legalMoves[i] = rootScores[i].first;
+		}
 
-                if (tt && !iterBestMove.isNull()) {
-                        const Score storedScore = scoreToTT(iterBestScore, position.ply);
-                        tt->store(position.hash, depth, storedScore, TT_EXACT, iterBestMove);
-                }
-        }
+		if (!iterBestMove.isNull()) {
+			const Score storedScore = scoreToTT(iterBestScore, position.ply);
+			tt->store(position.hash, depth, storedScore, TT_EXACT, iterBestMove);
+		}
+	}
 }
 
 template <bool HasNodeLimit>
 Score SearchEngine::coreSearch(int depth, Score alpha, Score beta, bool &searchCancelledOut) {
-        searchCancelledOut = false;
+	searchCancelledOut = false;
 
-        if constexpr (HasNodeLimit) {
-                if (--nodesRemaining < 0) {
-                        searchCancelledOut = true;
-                        return alpha;
-                }
-        }
-        if (requestedStop.load(std::memory_order_relaxed)) {
-                searchCancelledOut = true;
-                return alpha;
-        }
+	if constexpr (HasNodeLimit) {
+		if (--nodesRemaining < 0) {
+			searchCancelledOut = true;
+			return alpha;
+		}
+	}
+	if (requestedStop.load(std::memory_order_relaxed)) {
+		searchCancelledOut = true;
+		return alpha;
+	}
 
-        const uint64_t key = position.hash;
-        const Score originalAlpha = alpha;
-        const Score originalBeta = beta;
+	const uint64_t key = position.hash;
+	const Score originalAlpha = alpha;
+	const Score originalBeta = beta;
 
-        Move ttMove;
-        if (tt) {
-                TTEntry entry;
-                if (tt->probe(key, entry)) {
-                        if (!entry.bestMove.isNull()) {
-                                ttMove = entry.bestMove;
-                        }
-                        const Score ttScore = scoreFromTT(entry.value, position.ply);
-                        if (entry.depth >= depth) {
-                                if (entry.flag == TT_EXACT) {
-                                        return ttScore;
-                                }
-                                else if (entry.flag == TT_LOWER) {
-                                        alpha = std::max(alpha, ttScore);
-                                }
-                                else if (entry.flag == TT_UPPER) {
-                                        beta = std::min(beta, ttScore);
-                                }
+	Move ttMove;
+	TTEntry entry;
+	if (tt->probe(key, entry)) {
+		if (!entry.bestMove.isNull()) {
+			ttMove = entry.bestMove;
+		}
+		const Score ttScore = scoreFromTT(entry.value, position.ply);
+		if (entry.depth >= depth) {
+			if (entry.flag == TT_EXACT) {
+				return ttScore;
+			}
+			else if (entry.flag == TT_LOWER) {
+				alpha = std::max(alpha, ttScore);
+			}
+			else if (entry.flag == TT_UPPER) {
+				beta = std::min(beta, ttScore);
+			}
 
-                                if (alpha >= beta) {
-                                        return ttScore;
-                                }
-                        }
-                }
-        }
+			if (alpha >= beta) {
+				return ttScore;
+			}
+		}
+	}
 
-        // quick bailout for terminal nodes
-        MoveList legalMoves = moveGenerator.generateLegalMoves();
-        if (legalMoves.size() == 0) {
-                Score terminalScore = legalMoves.inCheck() ? MATED_SCORE + position.ply : 0;
-                if (tt) {
-                        const Score storedScore = scoreToTT(terminalScore, position.ply);
-                        tt->store(key, depth, storedScore, TT_EXACT, Move());
-                }
-                return terminalScore;
-        }
+	// quick bailout for terminal nodes
+	MoveList legalMoves = moveGenerator.generateLegalMoves();
+	if (legalMoves.size() == 0) {
+		Score terminalScore = legalMoves.inCheck() ? MATED_SCORE + position.ply : 0;
+		if (tt) {
+			const Score storedScore = scoreToTT(terminalScore, position.ply);
+			tt->store(key, depth, storedScore, TT_EXACT, Move());
+		}
+		return terminalScore;
+	}
 
-        if (depth == 0) {
-                Score evalScore = eval(position);
-                if (tt) {
-                        const Score storedScore = scoreToTT(evalScore, position.ply);
-                        tt->store(key, depth, storedScore, TT_EXACT, Move());
-                }
-                return evalScore;
-        }
+	if (depth == 0) {
+		Score evalScore = eval(position);
+		const Score storedScore = scoreToTT(evalScore, position.ply);
+		tt->store(key, depth, storedScore, TT_EXACT, Move());
+		return evalScore;
+	}
 
-        Score bestScore = -INF;
-        Move bestMoveLocal;
+	Score bestScore = -INF;
+	Move bestMoveLocal;
 
-        if (tt && !ttMove.isNull()) {
-                for (size_t i = 0; i < legalMoves.size(); ++i) {
-                        if (legalMoves[i] == ttMove) {
-                                if (i != 0) {
-                                        Move tmp = legalMoves[0];
-                                        legalMoves[0] = legalMoves[i];
-                                        legalMoves[i] = tmp;
-                                }
-                                break;
-                        }
-                }
-        }
+	if (!ttMove.isNull()) {
+		for (size_t i = 0; i < legalMoves.size(); ++i) {
+			if (legalMoves[i] == ttMove) {
+				if (i != 0) {
+					Move tmp = legalMoves[0];
+					legalMoves[0] = legalMoves[i];
+					legalMoves[i] = tmp;
+				}
+				break;
+			}
+		}
+	}
 
-        for (const Move &move : legalMoves) {
-                position.makeMove(move);
-                bool childCancelled = false;
-                Score childScore = -coreSearch<HasNodeLimit>(depth - 1, -beta, -alpha, childCancelled);
-                position.undoMove();
+	for (const Move &move : legalMoves) {
+		position.makeMove(move);
+		bool childCancelled = false;
+		Score childScore = -coreSearch<HasNodeLimit>(depth - 1, -beta, -alpha, childCancelled);
+		position.undoMove();
 
-                if (childCancelled) {
-                        searchCancelledOut = true;
-                        return alpha;
-                }
+		if (childCancelled) {
+			searchCancelledOut = true;
+			return alpha;
+		}
 
-                if (childScore > bestScore || bestMoveLocal.isNull()) {
-                        bestScore = childScore;
-                        bestMoveLocal = move;
-                }
-                alpha = std::max(alpha, childScore);
-                if (alpha >= beta) {
-                        break;
-                }
-        }
+		if (childScore > bestScore || bestMoveLocal.isNull()) {
+			bestScore = childScore;
+			bestMoveLocal = move;
+		}
+		alpha = std::max(alpha, childScore);
+		if (alpha >= beta) {
+			break;
+		}
+	}
 
-        if (tt) {
-                TTFlag flag = TT_EXACT;
-                if (bestScore <= originalAlpha) {
-                        flag = TT_UPPER;
-                }
-                else if (bestScore >= originalBeta) {
-                        flag = TT_LOWER;
-                }
-                const Score storedScore = scoreToTT(bestScore, position.ply);
-                tt->store(key, depth, storedScore, flag, bestMoveLocal);
-        }
+	if (tt) {
+		TTFlag flag = TT_EXACT;
+		if (bestScore <= originalAlpha) {
+			flag = TT_UPPER;
+		}
+		else if (bestScore >= originalBeta) {
+			flag = TT_LOWER;
+		}
+		const Score storedScore = scoreToTT(bestScore, position.ply);
+		tt->store(key, depth, storedScore, flag, bestMoveLocal);
+	}
 
-        return bestScore;
+	return bestScore;
 }
 
 Move SearchEngine::fetchBestMove(void) const { return bestMove; }
@@ -311,20 +299,20 @@ void SearchManager::runSearch(const Position &position, const GoLimits &goLimits
                               std::chrono::time_point<std::chrono::steady_clock> commandReceiveTP,
                               std::function<void(Move)> onFinishCallback,
                               TranspositionTable *ttPtr) {
-        stopSearch();  // stop any ongoing search
-        {
-                std::lock_guard<std::mutex> lock(timeControlMtx);
-                timeControlWakeRequested = false;
-        }
-        searchEngine.requestedStop.store(false, std::memory_order_relaxed);
+	stopSearch();  // stop any ongoing search
+	{
+		std::lock_guard<std::mutex> lock(timeControlMtx);
+		timeControlWakeRequested = false;
+	}
+	searchEngine.requestedStop.store(false, std::memory_order_relaxed);
 
-        // start search
-        timerThread = std::thread(&SearchManager::timeControlManager, this, goLimits, commandReceiveTP,
-                                  position.usColor);
-        searchThread = std::thread([this, position, goLimits, onFinishCallback, ttPtr]() {
-                searchEngine.search(position, goLimits, ttPtr);
-                onFinishCallback(searchEngine.fetchBestMove());
-        });
+	// start search
+	timerThread = std::thread(&SearchManager::timeControlManager, this, goLimits, commandReceiveTP,
+	                          position.usColor);
+	searchThread = std::thread([this, position, goLimits, onFinishCallback, ttPtr]() {
+		searchEngine.search(position, goLimits, ttPtr);
+		onFinishCallback(searchEngine.fetchBestMove());
+	});
 }
 
 void SearchManager::stopSearch(void) {

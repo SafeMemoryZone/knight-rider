@@ -379,9 +379,9 @@ void UciEngine::handleGoCmd(void) {
 
 		std::cout << "\nNodes searched: " << nodes << " in " << elapsedTime << '\n' << std::endl;
 	}
-        else {
-                searchManager.runSearch(pos, limits, recvTP, printBestMove, &tt);
-        }
+	else {
+		searchManager.runSearch(pos, limits, recvTP, printBestMove, &tt);
+	}
 }
 
 void UciEngine::handleStopCmd(void) { searchManager.stopSearch(); }
