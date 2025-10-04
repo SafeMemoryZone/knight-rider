@@ -427,6 +427,7 @@ void Position::undoMoveT() {
 	epSquare = u.epSquare;
 	rule50 = u.halfmoveClock;
 	castlingRights = u.castlingRights;
+    hash = u.hash;
 
 	usColor ^= 1;
 	oppColor ^= 1;
