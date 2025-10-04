@@ -11,6 +11,8 @@ class Move {
 	Move(void) = default;
 	inline Move(Bitboard from, Bitboard to, int movingPt, int promoPt, bool isCastling, bool isEp);
 
+	inline bool isNull(void) const;
+
 	inline std::string toLan(void) const;
 	inline Bitboard getFrom(void) const;
 	inline Bitboard getTo(void) const;
@@ -61,6 +63,8 @@ inline std::string Move::toLan(void) const {
 
 	return s;
 }
+
+inline bool Move::isNull(void) const { return move == 0; }
 
 inline Bitboard Move::getFrom(void) const { return 1ULL << (move & 0x3F); }
 inline Bitboard Move::getTo(void) const { return 1ULL << ((move >> 6) & 0x3F); }

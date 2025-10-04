@@ -19,7 +19,7 @@ class UciEngine {
 	void handleUcinewgameCmd(void);
 	void handlePositionCmd(void);
 	void handleGoCmd(void);
-    void handleStopCmd(void);
+	void handleStopCmd(void);
 
 	// token buffers
 	std::vector<std::string> tokens;

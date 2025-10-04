@@ -35,7 +35,6 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 
 		for (const Move &move : legalMoves) {
 			if (requestedStop.load(std::memory_order_relaxed)) {
-				aborted = true;
 				break;
 			}
 
@@ -55,15 +54,18 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 				iterBestScore = childScore;
 				iterBestMove = move;
 			}
+
 			rootScores.emplace_back(move, childScore);
 		}
 
-		if (aborted) {
-			// do not set best move if aborted
-			break;
+		// safe to set because we always explore the best move (from previous iteration) first
+		if (!iterBestMove.isNull()) {
+			bestMove = iterBestMove;
 		}
 
-		bestMove = iterBestMove;
+		if (aborted) {
+			break;
+		}
 
 		std::stable_sort(rootScores.begin(), rootScores.end(),
 		                 [](auto &a, auto &b) { return a.second > b.second; });
@@ -91,7 +93,7 @@ Score SearchEngine::coreSearch(int depth, Score alpha, Score beta, bool &searchC
 	// quick bailout for terminal nodes
 	MoveList legalMoves = moveGenerator.generateLegalMoves();
 	if (legalMoves.size() == 0) {
-		return legalMoves.inCheck() ? MATED_SCORE : 0;
+		return legalMoves.inCheck() ? MATED_SCORE + position.ply : 0;
 	}
 
 	if (depth == 0) {
@@ -112,9 +114,9 @@ Score SearchEngine::coreSearch(int depth, Score alpha, Score beta, bool &searchC
 		}
 
 		bestScore = std::max(bestScore, childScore);
-		if (childScore > alpha) {
-			alpha = childScore;
-			if (alpha >= beta) break;
+		alpha = std::max(alpha, childScore);
+		if (alpha >= beta) {
+			break;
 		}
 	}
 
@@ -155,7 +157,7 @@ void SearchManager::timeControlManager(
 			budget = (myTime / goLimits.movesToGo) + (int64_t)(incUse * (double)myInc);
 		}
 		else {
-			budget = (int64_t)(0.01 * (double)myTime + incUse * (double)myInc);
+			budget = (int64_t)(0.03 * (double)myTime + incUse * (double)myInc);
 		}
 
 		budget = std::min<int64_t>(budget, (int64_t)(maxBudgetFrac * (double)myTime));

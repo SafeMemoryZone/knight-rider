@@ -8,6 +8,12 @@
 
 #include "bitboards.hpp"
 #include "perft.hpp"
+#include "zobrist.hpp"
+
+static void preUciInit(void) {
+	initBitboards();
+	initZobristTables();
+}
 
 static std::vector<std::string> tokenizeLine(const std::string& line) {
 	std::istringstream iss(line);
@@ -28,7 +34,7 @@ static inline bool advanceIfPossible(const std::vector<std::string>& tokens, siz
 static void printBestMove(Move move) { printSafe("bestmove ", move.toLan()); }
 
 void UciEngine::start(void) {
-	initBitboards();
+	preUciInit();
 
 	std::string line;
 
@@ -267,8 +273,7 @@ void UciEngine::handleGoCmd(void) {
 	auto parseI32 = [&](int& out) -> bool {
 		if (tokenPos >= tokens.size()) return false;
 		try {
-			out = std::stoi(tokens[tokenPos]);
-			tokenPos++;
+			out = std::stoi(tokens[tokenPos++]);
 			return true;
 		} catch (...) {
 			return false;
@@ -277,8 +282,7 @@ void UciEngine::handleGoCmd(void) {
 	auto parseI64 = [&](int64_t& out) -> bool {
 		if (tokenPos >= tokens.size()) return false;
 		try {
-			out = std::stoll(tokens[tokenPos]);
-			tokenPos++;
+			out = std::stoll(tokens[tokenPos++]);
 			return true;
 		} catch (...) {
 			return false;
@@ -372,7 +376,7 @@ void UciEngine::handleGoCmd(void) {
 		auto endTime = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> elapsedTime = endTime - startTime;
 
-		std::cout << "Nodes searched: " << nodes << " in " << elapsedTime << std::endl;
+		std::cout << "\nNodes searched: " << nodes << " in " << elapsedTime << std::endl;
 	}
 	else {
 		searchManager.runSearch(pos, limits, recvTP, printBestMove);

@@ -9,11 +9,11 @@ class MoveGenerator {
 	MoveGenerator(void) = default;
 	explicit MoveGenerator(Position* position);
 
-	MoveList generateLegalMoves(void) const;
+	MoveList generateLegalMoves(bool onlyCaptures = false) const;
 
    private:
 	// color-specific templates
-	template <int UsColor>
+	template <int UsColor, bool OnlyCaptures>
 	MoveList generateLegalMovesT(void) const;
 	template <int UsColor>
 	Bitboard computeAttackMaskT(void) const;

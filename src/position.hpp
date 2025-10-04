@@ -38,6 +38,8 @@ struct Position {
 	uint8_t usColor;
 	uint8_t oppColor;
 
+	uint64_t hash;
+
 	int ply = 0;
 
    private:
@@ -47,6 +49,8 @@ struct Position {
 	void makeMoveT(Move move);
 	template <int UsColor>
 	void undoMoveT(void);
+
+	uint64_t computeHash(void);
 };
 
 #endif  // POSITION_HPP

@@ -24,9 +24,15 @@ static inline void addMovesToList(MoveList &moveList, Bitboard from, Bitboard al
 
 MoveGenerator::MoveGenerator(Position *position) : position(position), P(position->pieces) {}
 
-MoveList MoveGenerator::generateLegalMoves(void) const {
-	return (position->usColor == WHITE) ? generateLegalMovesT<WHITE>()
-	                                    : generateLegalMovesT<BLACK>();
+MoveList MoveGenerator::generateLegalMoves(bool onlyCaptures) const {
+	if (position->usColor == WHITE) {
+		return onlyCaptures ? generateLegalMovesT<WHITE, true>()
+		                    : generateLegalMovesT<WHITE, false>();
+	}
+	else {
+		return onlyCaptures ? generateLegalMovesT<BLACK, true>()
+		                    : generateLegalMovesT<BLACK, false>();
+	}
 }
 
 static Bitboard usOcc;
@@ -36,7 +42,7 @@ static Bitboard oppRooksQueens;
 static Bitboard oppBishopsQueens;
 static int kingSq;
 
-template <int UsColor>
+template <int UsColor, bool OnlyCaptures>
 MoveList MoveGenerator::generateLegalMovesT(void) const {
 	constexpr int OppColor = UsColor ^ 1;
 
@@ -69,7 +75,12 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 	                                    : 0ULL;
 	const Bitboard checkEvasionMask = isInCheck ? checkerMask | checkBlockMask : ~0ULL;
 	const Bitboard pinMask = computePinMaskT<UsColor>();
-	const Bitboard capturableSquares = ~usOcc;
+	const Bitboard capturableSquares = [] {
+		if constexpr (OnlyCaptures)
+			return oppOcc;  // only enemy squares
+		else
+			return ~usOcc;  // normal: empty or enemy
+	}();
 
 	// move generation start
 
@@ -85,8 +96,19 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 			if constexpr (UsColor == WHITE) {
 				// we are white
 				// pushes
-				Bitboard singlePush = WHITE_PAWN_SINGLE_PUSH_MASK[currPawnSq] & freeSquares;
-				Bitboard doublePush = ((singlePush & RANK_3) << 8) & freeSquares;
+				Bitboard singlePush = [&] {
+					if constexpr (OnlyCaptures)
+						return 0ULL;
+					else
+						return WHITE_PAWN_SINGLE_PUSH_MASK[currPawnSq] & freeSquares;
+				}();
+
+				Bitboard doublePush = [&] {
+					if constexpr (OnlyCaptures)
+						return 0ULL;
+					else
+						return ((singlePush & RANK_3) << 8) & freeSquares;
+				}();
 
 				// captures
 				Bitboard leftCapture = WHITE_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & oppOcc;
@@ -140,8 +162,19 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 			else {
 				// we are black
 				// pushes
-				Bitboard singlePush = BLACK_PAWN_SINGLE_PUSH_MASK[currPawnSq] & freeSquares;
-				Bitboard doublePush = ((singlePush & RANK_6) >> 8) & freeSquares;
+				Bitboard singlePush = [&] {
+					if constexpr (OnlyCaptures)
+						return 0ULL;
+					else
+						return BLACK_PAWN_SINGLE_PUSH_MASK[currPawnSq] & freeSquares;
+				}();
+
+				Bitboard doublePush = [&] {
+					if constexpr (OnlyCaptures)
+						return 0ULL;
+					else
+						return ((singlePush & RANK_6) >> 8) & freeSquares;
+				}();
 
 				// captures
 				Bitboard leftCapture = BLACK_PAWN_CAPTURE_LEFT_MASK[currPawnSq] & oppOcc;
@@ -277,45 +310,47 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 	addMovesToList(moveList, P[UsColor * 6 + PT_KING], kingMoves, PT_KING);
 
 	// castling generation if not in check
-	if (!isInCheck) {
-		if constexpr (UsColor == WHITE) {
-			constexpr Bitboard E1 = 1ULL << 4, F1 = 1ULL << 5, G1 = 1ULL << 6, D1 = 1ULL << 3,
-			                   C1 = 1ULL << 2, B1 = 1ULL << 1;
-			// we are white
-			// king-side
-			if (position->castlingRights & WHITE_KING_SIDE_CASTLE) {
-				Bitboard between = F1 | G1;
-				// squares empty && not attacked
-				if (!(occ & between) && !(attackMask & between)) {
-					moveList.push_back(Move(E1, G1, PT_KING, PT_NULL, true, false));
+	if constexpr (!OnlyCaptures) {
+		if (!isInCheck) {
+			if constexpr (UsColor == WHITE) {
+				constexpr Bitboard E1 = 1ULL << 4, F1 = 1ULL << 5, G1 = 1ULL << 6, D1 = 1ULL << 3,
+				                   C1 = 1ULL << 2, B1 = 1ULL << 1;
+				// we are white
+				// king-side
+				if (position->castlingRights & WHITE_KING_SIDE_CASTLE) {
+					Bitboard between = F1 | G1;
+					// squares empty && not attacked
+					if (!(occ & between) && !(attackMask & between)) {
+						moveList.push_back(Move(E1, G1, PT_KING, PT_NULL, true, false));
+					}
+				}
+				// queen-side
+				if (position->castlingRights & WHITE_QUEEN_SIDE_CASTLE) {
+					Bitboard between = B1 | C1 | D1;
+					Bitboard passSquares = D1 | C1;
+					if (!(occ & between) && !(attackMask & passSquares)) {
+						moveList.push_back(Move(E1, C1, PT_KING, PT_NULL, true, false));
+					}
 				}
 			}
-			// queen-side
-			if (position->castlingRights & WHITE_QUEEN_SIDE_CASTLE) {
-				Bitboard between = B1 | C1 | D1;
-				Bitboard passSquares = D1 | C1;
-				if (!(occ & between) && !(attackMask & passSquares)) {
-					moveList.push_back(Move(E1, C1, PT_KING, PT_NULL, true, false));
+			else {
+				constexpr Bitboard E8 = 1ULL << 60, F8 = 1ULL << 61, G8 = 1ULL << 62,
+				                   D8 = 1ULL << 59, C8 = 1ULL << 58, B8 = 1ULL << 57;
+				// we are black
+				// king-side
+				if (position->castlingRights & BLACK_KING_SIDE_CASTLE) {
+					Bitboard between = F8 | G8;
+					if (!(occ & between) && !(attackMask & between)) {
+						moveList.push_back(Move(E8, G8, PT_KING, PT_NULL, true, false));
+					}
 				}
-			}
-		}
-		else {
-			constexpr Bitboard E8 = 1ULL << 60, F8 = 1ULL << 61, G8 = 1ULL << 62, D8 = 1ULL << 59,
-			                   C8 = 1ULL << 58, B8 = 1ULL << 57;
-			// we are black
-			// king-side
-			if (position->castlingRights & BLACK_KING_SIDE_CASTLE) {
-				Bitboard between = F8 | G8;
-				if (!(occ & between) && !(attackMask & between)) {
-					moveList.push_back(Move(E8, G8, PT_KING, PT_NULL, true, false));
-				}
-			}
-			// queen-side
-			if (position->castlingRights & BLACK_QUEEN_SIDE_CASTLE) {
-				Bitboard between = B8 | C8 | D8;
-				Bitboard passSquares = D8 | C8;
-				if (!(occ & between) && !(attackMask & passSquares)) {
-					moveList.push_back(Move(E8, C8, PT_KING, PT_NULL, true, false));
+				// queen-side
+				if (position->castlingRights & BLACK_QUEEN_SIDE_CASTLE) {
+					Bitboard between = B8 | C8 | D8;
+					Bitboard passSquares = D8 | C8;
+					if (!(occ & between) && !(attackMask & passSquares)) {
+						moveList.push_back(Move(E8, C8, PT_KING, PT_NULL, true, false));
+					}
 				}
 			}
 		}

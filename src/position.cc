@@ -3,11 +3,11 @@
 #include <cassert>
 #include <cctype>
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 #include "bitboards.hpp"
 #include "misc.hpp"
+#include "zobrist.hpp"
 
 Position::Position(void)
     : occForColor{},
@@ -164,7 +164,7 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 }
 
 bool Position::operator==(const Position &other) const noexcept {
-	return std::equal(other.occForColor, other.occForColor + 12, occForColor) &&
+	return std::equal(other.occForColor, other.occForColor + 2, occForColor) &&
 	       std::equal(other.pieces, other.pieces + 12, pieces) && other.epSquare == epSquare &&
 	       other.rule50 == rule50 && other.castlingRights == castlingRights &&
 	       other.usColor == usColor && other.oppColor == oppColor;
@@ -497,3 +497,29 @@ void Position::undoMoveT() {
 }
 
 void Position::resetPly(void) { ply = 0; }
+
+uint64_t Position::computeHash(void) {
+	uint64_t h = 0;
+	// pieces
+	for (int p = 0; p < 12; ++p) {
+		uint64_t b = pieces[p];
+		while (b) {
+			int sq = std::countr_zero(b);
+			b &= b - 1;
+			h ^= Z_PSQ[p][sq];
+		}
+	}
+
+	h ^= Z_CASTLING[castlingRights];
+
+	if (epSquare) {
+		int file = std::countr_zero(epSquare) & 7;
+		h ^= Z_EP_FILE[file];
+	}
+
+	if (usColor == BLACK) {
+		h ^= Z_BLACK_TO_MOVE;
+	}
+
+	return h;
+}
