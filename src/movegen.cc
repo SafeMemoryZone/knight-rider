@@ -415,14 +415,14 @@ Bitboard MoveGenerator::computeCheckerMaskT(void) const {
 	// pawns
 	if constexpr (UsColor == WHITE) {
 		// we are white
-		// use white pawns beacause we are looking from the perspective of the king
+                // use white pawns because we are looking from the perspective of the king
 		checkerMask |=
 		    (WHITE_PAWN_CAPTURE_LEFT_MASK[kingSq] | WHITE_PAWN_CAPTURE_RIGHT_MASK[kingSq]) &
 		    P[PT_PAWN + 6];
 	}
 	else {
 		// we are black
-		// use black pawns beacause we are looking from the perspective of the king
+                // use black pawns because we are looking from the perspective of the king
 		checkerMask |=
 		    (BLACK_PAWN_CAPTURE_LEFT_MASK[kingSq] | BLACK_PAWN_CAPTURE_RIGHT_MASK[kingSq]) &
 		    P[PT_PAWN];

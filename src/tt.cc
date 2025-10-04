@@ -53,7 +53,7 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 
 	for (int i = 0; i < CLUSTER_SIZE; ++i) {
 		TTEntry &entry = table[base + static_cast<unsigned>(i)];
-		if (entry.depth < 0 && emptyIdx < 0) {  // pick fist empty
+                if (entry.depth < 0 && emptyIdx < 0) {  // pick first empty
 			emptyIdx = i;
 		}
 		if (entry.keyTag == tag) {  // same position tag

@@ -6,7 +6,7 @@
 #include "misc.hpp"
 #include "move.hpp"
 
-// container for list of move
+// container for list of moves
 class MoveList {
    public:
 	MoveList(void) = default;
