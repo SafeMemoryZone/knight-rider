@@ -34,6 +34,8 @@ Position::Position(void)
 			occForColor[color] |= pieces[color * 6 + pt];
 		}
 	}
+
+	hash = computeHash();
 }
 
 Position Position::fromFen(const std::string &fen, bool &success) noexcept {
@@ -155,6 +157,7 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 		pos.rule50 = value;
 
 		success = true;
+		pos.hash = pos.computeHash();
 		return pos;
 
 	} catch (...) {
@@ -286,6 +289,7 @@ void Position::makeMoveT(Move move) {
 	u.castlingRights = castlingRights;
 	u.epSquare = epSquare;
 	u.halfmoveClock = rule50;
+	u.hash = hash;
 
 	Bitboard from = move.getFrom();
 	Bitboard to = move.getTo();

@@ -14,6 +14,7 @@ struct UndoInfo {
 	int halfmoveClock;
 	uint8_t castlingRights;
 	uint8_t capturedType;
+	uint64_t hash;
 };
 
 // chess position representation
