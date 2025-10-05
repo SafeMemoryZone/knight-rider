@@ -30,7 +30,7 @@ constexpr int BLACK_QUEEN_SIDE_CASTLE = 1 << 3;
 constexpr Score MATED_SCORE = -100'000'000;
 constexpr Score INF = std::numeric_limits<int32_t>::max();
 
-constexpr int MAX_PLY = 256;
+constexpr int MAX_PLY = std::numeric_limits<int8_t>::max();
 constexpr int MAX_MOVES = 256;
 
 // safe printing

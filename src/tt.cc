@@ -69,7 +69,27 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 	}
 
 	int victimIdx = -1;
+	auto flagPriority = [](TTFlag flag) {
+		switch (flag) {
+			case TT_EXACT:
+				return 2;
+			case TT_LOWER:
+				return 1;
+			case TT_UPPER:
+			default:
+				return 0;
+		}
+	};
 	if (sameIdx >= 0) {
+		TTEntry &existing = table[base + static_cast<unsigned>(sameIdx)];
+		const int existingDepth = static_cast<int>(existing.depth);
+		const bool betterFlag =
+		    flagPriority(flag) > flagPriority(static_cast<TTFlag>(existing.flag));
+
+		if (!betterFlag && depth < existingDepth) {
+			return;  // keep deeper entry
+		}
+
 		victimIdx = sameIdx;
 	}
 	else if (emptyIdx >= 0) {
@@ -97,6 +117,6 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 	v.value = value;
 	v.age = age;
 	v.keyTag = tag;
-	v.depth = static_cast<int8_t>(depth);  // WARN: assumes depth <= 127
+	v.depth = static_cast<int8_t>(depth);
 	v.flag = static_cast<uint8_t>(flag);
 }
