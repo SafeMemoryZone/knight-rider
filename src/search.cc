@@ -9,6 +9,10 @@
 constexpr Score NEG_MATE_THRESHOLD = MATED_SCORE + MAX_PLY;
 constexpr Score POS_MATE_THRESHOLD = -MATED_SCORE - MAX_PLY;
 
+static inline bool isMateScore(Score s) {
+	return s <= NEG_MATE_THRESHOLD || s >= POS_MATE_THRESHOLD;
+}
+
 static inline Score scoreToTT(Score score, int ply) {
 	if (score <= NEG_MATE_THRESHOLD) {
 		return score - ply;
@@ -67,7 +71,7 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 		depthLimit = std::min(depthLimit, goLimits.proveMateInN * 2);
 	}
 
-	for (int depth = 1; depth <= depthLimit; ++depth) {
+	for (int depth = 1; depth <= depthLimit; depth++) {
 		Score iterBestScore = -INF;
 		Move iterBestMove;
 
@@ -110,9 +114,13 @@ void SearchEngine::search(const Position &searchPosition, const GoLimits &goLimi
 			break;
 		}
 
+		if (isMateScore(iterBestScore)) {
+			break;
+		}
+
 		std::stable_sort(rootScores.begin(), rootScores.end(),
 		                 [](auto &a, auto &b) { return a.second > b.second; });
-		for (size_t i = 0; i < rootScores.size(); ++i) {
+		for (size_t i = 0; i < rootScores.size(); i++) {
 			legalMoves[i] = rootScores[i].first;
 		}
 
@@ -188,7 +196,7 @@ Score SearchEngine::coreSearch(int depth, Score alpha, Score beta, bool &searchC
 	Move bestMoveLocal;
 
 	if (!ttMove.isNull()) {
-		for (size_t i = 0; i < legalMoves.size(); ++i) {
+		for (size_t i = 0; i < legalMoves.size(); i++) {
 			if (legalMoves[i] == ttMove) {
 				if (i != 0) {
 					Move tmp = legalMoves[0];

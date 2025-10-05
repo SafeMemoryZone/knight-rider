@@ -105,7 +105,7 @@ void UciEngine::start(void) {
 void UciEngine::handleUciCmd(void) {
 	printSafe("id name Knightrider");
 	printSafe("id author Viliam Holly");
-	printSafe("option name Hash type spin default 10 min 1 max 131072");
+	printSafe("option name Hash type spin default 10 min 1 max 512");
 	printSafe("option name Clear Hash type button");
 	printSafe("uciok");
 }
