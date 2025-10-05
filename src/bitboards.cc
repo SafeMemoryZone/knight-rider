@@ -155,7 +155,8 @@ static void initRookAttackMask(void) {
 				}
 			}
 
-			int idx = (int)((blockerPattern * ROOK_MAGIC[sq]) >> (64 - ROOK_RELEVANT_BITS[sq]));
+			int idx = static_cast<int>((blockerPattern * ROOK_MAGIC[sq]) >>
+			                           (64 - ROOK_RELEVANT_BITS[sq]));
 			ROOK_ATTACK_MASK[sq][idx] = rookAttacksBb;
 
 			if (!blockerPattern) {
@@ -203,7 +204,8 @@ static void initBishopAttackMask(void) {
 				}
 			}
 
-			int idx = (int)((blockerPattern * BISHOP_MAGIC[sq]) >> (64 - BISHOP_RELEVANT_BITS[sq]));
+			int idx = static_cast<int>((blockerPattern * BISHOP_MAGIC[sq]) >>
+			                           (64 - BISHOP_RELEVANT_BITS[sq]));
 			BISHOP_ATTACK_MASK[sq][idx] = bishopAttacksBb;
 
 			if (!blockerPattern) {

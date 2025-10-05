@@ -23,7 +23,8 @@ static inline void addMovesToList(MoveList &moveList, Bitboard from, Bitboard al
 	}
 }
 
-MoveGenerator::MoveGenerator(Position *position) : position(position), P(position->pieces) {}
+MoveGenerator::MoveGenerator(Position *positionPtr)
+    : position(positionPtr), P(positionPtr->pieces) {}
 
 MoveList MoveGenerator::generateLegalMoves(bool onlyCaptures) const {
 	if (position->usColor == WHITE) {

@@ -16,7 +16,7 @@ void initZobristTables(uint64_t seed) {
 	uint64_t s = seed;
 
 	for (int p = 0; p < 12; p++) {
-		for (int sq = 0; sq < 64; ++sq) {
+		for (int sq = 0; sq < 64; sq++) {
 			Z_PSQ[p][sq] = splitmix64(s);
 		}
 	}

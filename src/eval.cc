@@ -90,7 +90,7 @@ static inline Score pstScore(const Position& pos) {
 	Score score = 0;
 	const Bitboard* p = pos.pieces;
 
-	for (int pt = 0; pt < 6; ++pt) {
+	for (int pt = 0; pt < 6; pt++) {
 		const int16_t* pst = PST[pt];
 
 		// white

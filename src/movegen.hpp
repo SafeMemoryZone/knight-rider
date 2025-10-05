@@ -7,7 +7,7 @@
 class MoveGenerator {
    public:
 	MoveGenerator(void) = default;
-	explicit MoveGenerator(Position* position);
+	explicit MoveGenerator(Position* positionPtr);
 
 	MoveList generateLegalMoves(bool onlyCaptures = false) const;
 

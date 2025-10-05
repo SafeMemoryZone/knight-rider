@@ -9,7 +9,7 @@
 enum TTFlag : uint8_t { TT_EXACT, TT_LOWER, TT_UPPER };
 
 struct TTEntry {
-    static TTEntry makeEmptyEntry(void);
+	static TTEntry makeEmptyEntry(void);
 
 	Move bestMove;    // best move from this position
 	Score value;      // value of the node that depends on TTFlag
@@ -22,9 +22,9 @@ struct TTEntry {
 class TranspositionTable {
    public:
 	TranspositionTable(void) = default;
-    ~TranspositionTable(void);
+	~TranspositionTable(void);
 
-    void clear(void);
+	void clear(void);
 	void newSearch(void);
 	void resize(size_t mb);
 	bool probe(uint64_t key, TTEntry& out) const;
@@ -33,11 +33,11 @@ class TranspositionTable {
    private:
 	inline size_t getClusterBase(uint64_t key) const {
 		const size_t numClusters = capacity / CLUSTER_SIZE;
-		const size_t clusterIdx = (size_t)(key % numClusters);
+		const size_t clusterIdx = static_cast<size_t>(key % numClusters);
 		return clusterIdx * CLUSTER_SIZE;
 	}
 
-	static inline uint16_t getKeyTag(uint64_t key) { return key >> 48; }
+	static inline uint16_t getKeyTag(uint64_t key) { return static_cast<uint16_t>(key >> 48); }
 
 	static constexpr int CLUSTER_SIZE = 4;
 

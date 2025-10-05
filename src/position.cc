@@ -45,7 +45,7 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 	Position pos;
 
 	// reset to empty
-	for (int i = 0; i < 12; ++i) pos.pieces[i] = 0ULL;
+	for (int i = 0; i < 12; i++) pos.pieces[i] = 0ULL;
 	pos.occForColor[0] = pos.occForColor[1] = 0ULL;
 	pos.epSquare = 0ULL;
 	pos.rule50 = 0;
@@ -104,8 +104,8 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 		// occupancy
 		pos.occForColor[0] = 0;
 		pos.occForColor[1] = 0;
-		for (int color = 0; color < 2; ++color) {
-			for (int pt = 0; pt < 6; ++pt) {
+		for (int color = 0; color < 2; color++) {
+			for (int pt = 0; pt < 6; pt++) {
 				pos.occForColor[color] |= pos.pieces[color * 6 + pt];
 			}
 		}
@@ -190,7 +190,7 @@ std::string Position::toFen(void) const {
 	                                        'p', 'n', 'b', 'r', 'q', 'k'};
 
 	// piece placement
-	for (int rank = 7; rank >= 0; --rank) {
+	for (int rank = 7; rank >= 0; rank--) {
 		int runningEmptyCount = 0;
 		for (int file = 0; file < 8; file++) {
 			uint64_t pieceBb = 1ULL << (rank * 8 + file);
@@ -340,7 +340,7 @@ void Position::makeMoveT(Move move) {
 		Bitboard hit = to & occForColor[OppColor];
 		if (hit) {
 			// find which piece type
-			for (int pt = 0; pt < 6; ++pt) {
+			for (int pt = 0; pt < 6; pt++) {
 				if (pieces[OppColor * 6 + pt] & hit) {
 					capturedType = pt;
 					pieces[OppColor * 6 + pt] ^= hit;
@@ -353,7 +353,7 @@ void Position::makeMoveT(Move move) {
 			}
 		}
 	}
-	u.capturedType = (uint8_t)capturedType;
+	u.capturedType = static_cast<uint8_t>(capturedType);
 
 	// move the actual piece
 	int base = UsColor * 6 + movingPt;
@@ -566,7 +566,7 @@ void Position::resetPly(void) { ply = 0; }
 uint64_t Position::computeHash(void) {
 	uint64_t h = 0;
 	// pieces
-	for (int p = 0; p < 12; ++p) {
+	for (int p = 0; p < 12; p++) {
 		uint64_t b = pieces[p];
 		while (b) {
 			int sq = std::countr_zero(b);

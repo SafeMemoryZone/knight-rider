@@ -28,7 +28,7 @@ void TranspositionTable::clear(void) {
 	}
 }
 
-void TranspositionTable::newSearch(void) { ++age; }
+void TranspositionTable::newSearch(void) { age++; }
 
 void TranspositionTable::resize(size_t mb) {
 	size_t bytes = mb * 1024ULL * 1024ULL;
@@ -51,7 +51,7 @@ bool TranspositionTable::probe(uint64_t key, TTEntry &out) const {
 	const size_t base = getClusterBase(key);
 	const uint16_t tag = getKeyTag(key);
 
-	for (unsigned i = 0; i < CLUSTER_SIZE; ++i) {
+	for (unsigned i = 0; i < CLUSTER_SIZE; i++) {
 		const TTEntry &entry = table[base + i];
 		if (entry.depth >= 0 && entry.keyTag == tag) {
 			out = entry;
@@ -70,7 +70,7 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 	int emptyIdx = -1;
 	int sameIdx = -1;
 
-	for (int i = 0; i < CLUSTER_SIZE; ++i) {
+	for (int i = 0; i < CLUSTER_SIZE; i++) {
 		TTEntry &entry = table[base + static_cast<unsigned>(i)];
 		if (entry.depth < 0 && emptyIdx < 0) {  // pick first empty
 			emptyIdx = i;
@@ -82,8 +82,8 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 	}
 
 	int victimIdx = -1;
-	auto flagPriority = [](TTFlag flag) {
-		switch (flag) {
+	auto flagPriority = [](TTFlag entryFlag) {
+		switch (entryFlag) {
 			case TT_EXACT:
 				return 2;
 			case TT_LOWER:
@@ -111,7 +111,7 @@ void TranspositionTable::store(uint64_t key, int depth, Score value, TTFlag flag
 	else {
 		int bestScoreIdx = 0;
 		int bestScore = -1;  // higher = more replaceable
-		for (int i = 0; i < CLUSTER_SIZE; ++i) {
+		for (int i = 0; i < CLUSTER_SIZE; i++) {
 			TTEntry &e = table[base + static_cast<unsigned>(i)];
 			const int depthTerm = (127 - static_cast<int>(e.depth)) * 256;
 			const int ageTerm = static_cast<int>(static_cast<uint16_t>(age - e.age));

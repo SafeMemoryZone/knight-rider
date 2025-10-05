@@ -16,7 +16,9 @@ endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
   set(CMAKE_CXX_FLAGS_DEBUG
       "-g -O0 -Wall -Wextra -Wpedantic -Wshadow -Wconversion")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -flto -march=native -Wall -Wextra")
+  set(CMAKE_CXX_FLAGS_RELEASE
+      "-O3 -DNDEBUG -march=native -Wall -Wextra -Wpedantic -Wshadow -Wconversion"
+  )
 
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS_DEBUG "/Zi /Od /Wall /permissive-")

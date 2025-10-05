@@ -266,7 +266,7 @@ void SearchManager::timeControlManager(
 
 	auto compute_time_budget_ms = [&]() -> int64_t {
 		if (goLimits.moveTimeMS > 0) {
-			return (int64_t)goLimits.moveTimeMS;  // fixed movetime from UCI
+			return static_cast<int64_t>(goLimits.moveTimeMS);  // fixed movetime from UCI
 		}
 
 		int64_t myTime = goLimits.timeLeftMS[engineColor];
@@ -275,13 +275,16 @@ void SearchManager::timeControlManager(
 		int64_t budget;
 		if (goLimits.movesToGo > 0) {
 			// spread remaining time across remaining moves + part of increment
-			budget = (myTime / goLimits.movesToGo) + (int64_t)(incUse * (double)myInc);
+			budget = (myTime / goLimits.movesToGo) +
+			         static_cast<int64_t>((incUse * static_cast<double>(myInc)));
 		}
 		else {
-			budget = (int64_t)(0.03 * (double)myTime + incUse * (double)myInc);
+			budget = static_cast<int64_t>(0.03 * static_cast<double>(myTime) +
+			                              incUse * static_cast<double>(myInc));
 		}
 
-		budget = std::min<int64_t>(budget, (int64_t)(maxBudgetFrac * (double)myTime));
+		budget = std::min<int64_t>(
+		    budget, static_cast<int64_t>(maxBudgetFrac * static_cast<double>(myTime)));
 		budget = std::max<int64_t>(budget, minBudget);
 		return budget;
 	};
