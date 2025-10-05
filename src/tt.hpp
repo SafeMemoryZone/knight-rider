@@ -9,6 +9,8 @@
 enum TTFlag : uint8_t { TT_EXACT, TT_LOWER, TT_UPPER };
 
 struct TTEntry {
+    static TTEntry makeEmptyEntry(void);
+
 	Move bestMove;    // best move from this position
 	Score value;      // value of the node that depends on TTFlag
 	uint16_t age;     // age to replace old entries with newer ones

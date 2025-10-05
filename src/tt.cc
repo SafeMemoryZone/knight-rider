@@ -2,6 +2,18 @@
 
 #include <algorithm>
 #include <cstring>
+#include <limits>
+
+TTEntry TTEntry::makeEmptyEntry(void) {
+	TTEntry entry;
+	entry.bestMove = Move();
+	entry.value = 0;
+	entry.age = std::numeric_limits<uint16_t>::max();
+	entry.keyTag = std::numeric_limits<uint16_t>::max();
+	entry.depth = -1;
+	entry.flag = static_cast<uint8_t>(TT_UPPER);
+	return entry;
+}
 
 TranspositionTable::~TranspositionTable(void) {
 	if (table) {
@@ -11,7 +23,8 @@ TranspositionTable::~TranspositionTable(void) {
 
 void TranspositionTable::clear(void) {
 	if (table && capacity != 0) {
-		std::memset(table, 0xFF, capacity * sizeof(TTEntry));
+		const TTEntry empty = TTEntry::makeEmptyEntry();
+		std::fill(table, table + capacity, empty);
 	}
 }
 
@@ -27,7 +40,7 @@ void TranspositionTable::resize(size_t mb) {
 	}
 
 	table = new TTEntry[capacity];
-	std::memset(table, 0xFF, capacity * sizeof(TTEntry));
+	clear();
 	age = 0;
 }
 
