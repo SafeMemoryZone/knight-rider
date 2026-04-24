@@ -64,6 +64,63 @@ static Score scoreFromTT(Score score, int ply) {
 	return score;
 }
 
+static int pieceTypeOn(const Position &pos, Bitboard sq, int color) {
+	for (int pt = 0; pt < 6; pt++) {
+		if (pos.pieces[color * 6 + pt] & sq) return pt;
+	}
+	return PT_NULL;
+}
+
+static void scoreMoves(const MoveList &moves, int scores[], const Position &pos, Move ttMove) {
+	// MVV-LVA[victim][attacker]
+	static constexpr int MVV_LVA[6][6] = {
+	    /* victim P */ {0, -220, -230, -400, -800, -19900},
+	    /* victim N */ {220, 0, -10, -180, -580, -19680},
+	    /* victim B */ {230, 10, 0, -170, -570, -19670},
+	    /* victim R */ {400, 180, 170, 0, -400, -19500},
+	    /* victim Q */ {800, 580, 570, 400, 0, -19100},
+	};
+
+	static constexpr int TT_MOVE_SCORE = 10'000'000;
+	static constexpr int CAPTURE_BASE = 1'000'000;
+
+	for (size_t i = 0; i < moves.size(); i++) {
+		const Move &m = moves[i];
+
+		if (m == ttMove) {
+			scores[i] = TT_MOVE_SCORE;
+			continue;
+		}
+
+		int victim = m.getIsEp() ? PT_PAWN : pieceTypeOn(pos, m.getTo(), pos.oppColor);
+
+		if (victim != PT_NULL) {
+			scores[i] = CAPTURE_BASE + MVV_LVA[victim][m.getMovingPt()];
+		}
+		else {
+			scores[i] = 0;
+		}
+	}
+}
+
+// Partial selection sort: swap the highest-scored remaining move into position i
+static void pickNext(MoveList &moves, int scores[], size_t i) {
+	size_t best = i;
+	for (size_t j = i + 1; j < moves.size(); j++) {
+		if (scores[j] > scores[best]) {
+			best = j;
+		}
+	}
+	if (best != i) {
+		Move tmp = moves[best];
+		moves[best] = moves[i];
+		moves[i] = tmp;
+		int ts = scores[best];
+		scores[best] = scores[i];
+		scores[i] = ts;
+	}
+}
+
 void Engine::startSearch(const Position &pos, TranspositionTable *tt, const GoLimits &limits,
                          std::chrono::time_point<std::chrono::steady_clock> commandReceiveTime) {
 	// join any previous search thread before starting a new one
@@ -257,20 +314,13 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	Score bestScore = -INF;
 	Move bestMoveLocal;
 
-	if (!ttMove.isNull()) {
-		for (size_t i = 0; i < legalMoves.size(); i++) {
-			if (legalMoves[i] == ttMove) {
-				if (i != 0) {
-					Move tmp = legalMoves[0];
-					legalMoves[0] = legalMoves[i];
-					legalMoves[i] = tmp;
-				}
-				break;
-			}
-		}
-	}
+	int moveScores[MAX_MOVES];
+	scoreMoves(legalMoves, moveScores, searchPos, ttMove);
 
-	for (const Move &move : legalMoves) {
+	for (size_t i = 0; i < legalMoves.size(); i++) {
+		pickNext(legalMoves, moveScores, i);
+		const Move &move = legalMoves[i];
+
 		searchPos.makeMove(move);
 		bool childCancelled = false;
 		Score childScore = -negamax(depth - 1, -beta, -alpha, childCancelled);
@@ -346,7 +396,13 @@ Score Engine::quiescence(Score alpha, Score beta, bool &searchCancelledOut) {
 		if (bestScore > alpha) alpha = bestScore;
 	}
 
-	for (const Move &m : moves) {
+	int moveScores[MAX_MOVES];
+	scoreMoves(moves, moveScores, searchPos, Move());
+
+	for (size_t i = 0; i < moves.size(); i++) {
+		pickNext(moves, moveScores, i);
+		const Move &m = moves[i];
+
 		searchPos.makeMove(m);
 		bool childCancelled = false;
 		Score score = -quiescence(-beta, -alpha, childCancelled);
@@ -357,9 +413,15 @@ Score Engine::quiescence(Score alpha, Score beta, bool &searchCancelledOut) {
 			return alpha;
 		}
 
-		if (score >= beta) return score;
-		if (score > bestScore) bestScore = score;
-		if (score > alpha) alpha = score;
+		if (score >= beta) {
+			return score;
+		}
+		if (score > bestScore) {
+			bestScore = score;
+		}
+		if (score > alpha) {
+			alpha = score;
+		}
 	}
 
 	return bestScore;
