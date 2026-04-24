@@ -8,8 +8,11 @@
 // Returns the time budget in milliseconds for the current move.
 // Returns 0 if there are no time controls
 static int64_t computeTimeBudget(const GoLimits &goLimits, int engineColor) {
+	// Time lost to UCI communication, OS scheduling, etc.
+	constexpr int64_t overhead = 50;
+
 	if (goLimits.moveTimeMS > 0) {
-		return goLimits.moveTimeMS;
+		return std::max<int64_t>(1, goLimits.moveTimeMS - overhead);
 	}
 
 	const bool hasTimeControls = goLimits.timeLeftMS[0] > 0 || goLimits.timeLeftMS[1] > 0 ||
@@ -21,9 +24,6 @@ static int64_t computeTimeBudget(const GoLimits &goLimits, int engineColor) {
 
 	const int64_t myTime = goLimits.timeLeftMS[engineColor];
 	const int64_t myInc = goLimits.incMS[engineColor];
-
-	// Time lost to UCI communication, OS scheduling, etc.
-	constexpr int64_t overhead = 50;
 
 	// Available time after reserving overhead
 	const int64_t safeTime = std::max<int64_t>(1, myTime - overhead);
@@ -162,16 +162,18 @@ void Engine::rootNegamax(const GoLimits &limits) {
 			childScores.emplace_back(move, childScore);
 		}
 
-		// safe to set because we always explore the best move (from previous iteration) first
+		// update bestMove even on partial iterations (first move from prev iter is reliable)
 		if (!bestMoveFound.isNull()) {
 			bestMove = bestMoveFound;
-			const Score storedScore = scoreToTT(bestChildScore, searchPos.ply);
-			searchTt->store(searchPos.hash, depth, storedScore, TT_EXACT, bestMoveFound);
 		}
 
 		if (aborted) {
 			break;
 		}
+
+		// only store TT_EXACT after a fully completed iteration
+		const Score storedScore = scoreToTT(bestChildScore, searchPos.ply);
+		searchTt->store(searchPos.hash, depth, storedScore, TT_EXACT, bestMoveFound);
 
 		// simple move ordering
 		std::stable_sort(childScores.begin(), childScores.end(),
@@ -230,9 +232,25 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	}
 
 	if (depth == 0) {
-		Score evalScore = eval(searchPos);
+		bool quiescenceCancelled = false;
+		// WARN: do NOT invert alpha and beta here
+		Score evalScore = quiescence(alpha, beta, quiescenceCancelled);
+
+		if (quiescenceCancelled) {
+			searchCancelledOut = true;
+			return alpha;
+		}
+
+		TTFlag flag = TT_EXACT;
+		if (evalScore <= originalAlpha) {
+			flag = TT_UPPER;  // Fail-Low (we didn't beat alpha)
+		}
+		else if (evalScore >= beta) {
+			flag = TT_LOWER;  // Fail-High (beta cutoff)
+		}
+
 		const Score storedScore = scoreToTT(evalScore, ply);
-		searchTt->store(key, depth, storedScore, TT_EXACT, Move());
+		searchTt->store(key, depth, storedScore, flag, Move());
 		return evalScore;
 	}
 
@@ -284,6 +302,65 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	}
 	const Score storedScore = scoreToTT(bestScore, ply);
 	searchTt->store(key, depth, storedScore, flag, bestMoveLocal);
+
+	return bestScore;
+}
+
+Score Engine::quiescence(Score alpha, Score beta, bool &searchCancelledOut) {
+	searchCancelledOut = false;
+
+	if (nodesSearched >= maxNodes || searchStopRequested) {
+		searchCancelledOut = true;
+		return alpha;
+	}
+
+	nodesSearched++;
+
+	if (hasDeadline && (nodesSearched & 4095) == 0) {
+		if (std::chrono::steady_clock::now() >= deadline) {
+			searchStopRequested = true;
+			searchCancelledOut = true;
+			return alpha;
+		}
+	}
+
+	// generate captures to detect check status
+	MoveList moves = gen.generateLegalMoves(true);
+	bool inCheck = moves.inCheck();
+
+	// in check: need ALL legal moves (evasions), not just captures
+	if (inCheck) {
+		moves = gen.generateLegalMoves();
+		if (moves.size() == 0) {
+			return MATED_SCORE + searchPos.ply;
+		}
+	}
+
+	Score bestScore;
+	if (inCheck) {
+		bestScore = -INF;  // no stand-pat when in check — must escape
+	}
+	else {
+		bestScore = eval(searchPos);
+		if (bestScore >= beta) return bestScore;
+		if (bestScore > alpha) alpha = bestScore;
+	}
+
+	for (const Move &m : moves) {
+		searchPos.makeMove(m);
+		bool childCancelled = false;
+		Score score = -quiescence(-beta, -alpha, childCancelled);
+		searchPos.undoMove();
+
+		if (childCancelled) {
+			searchCancelledOut = true;
+			return alpha;
+		}
+
+		if (score >= beta) return score;
+		if (score > bestScore) bestScore = score;
+		if (score > alpha) alpha = score;
+	}
 
 	return bestScore;
 }
