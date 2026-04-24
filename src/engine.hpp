@@ -30,6 +30,7 @@ class Engine {
    private:
 	void rootNegamax(const GoLimits &limits);
 	Score negamax(int depth, Score alpha, Score beta, bool &searchCancelledOut);
+	Score quiescence(Score alpha, Score beta, bool &searchCancelledOut);
 
 	Move bestMove;
 
