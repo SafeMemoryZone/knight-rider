@@ -279,7 +279,12 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 		}
 	}
 
-	// quick bailout for terminal nodes
+	if (searchPos.is50MoveDraw() || searchPos.isInsufficientMaterial() ||
+	    searchPos.isRepetition()) {
+		return 0;
+	}
+
+	// quick bailout for checkmates and draws
 	MoveList legalMoves = gen.generateLegalMoves();
 	if (legalMoves.size() == 0) {
 		Score terminalScore = legalMoves.inCheck() ? MATED_SCORE + ply : 0;
@@ -358,6 +363,10 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 
 Score Engine::quiescence(Score alpha, Score beta, bool &searchCancelledOut) {
 	searchCancelledOut = false;
+
+	if (searchPos.ply >= MAX_PLY - 1) {
+		return eval(searchPos);
+	}
 
 	if (nodesSearched >= maxNodes || searchStopRequested) {
 		searchCancelledOut = true;

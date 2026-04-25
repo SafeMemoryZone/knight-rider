@@ -37,6 +37,8 @@ Position::Position(void)
 	}
 
 	hash = computeHash();
+	hashHistory.clear();
+	saveHash();
 }
 
 Position Position::fromFen(const std::string &fen, bool &success) noexcept {
@@ -168,6 +170,8 @@ Position Position::fromFen(const std::string &fen, bool &success) noexcept {
 
 		success = true;
 		pos.hash = pos.computeHash();
+		pos.hashHistory.clear();
+		pos.saveHash();
 		return pos;
 
 	} catch (...) {
@@ -563,6 +567,76 @@ void Position::undoMoveT() {
 
 void Position::resetPly(void) { ply = 0; }
 
+bool Position::is50MoveDraw(void) const noexcept {
+	// 100 half-moves = 50 full moves
+	return rule50 >= 100;
+}
+
+bool Position::isInsufficientMaterial(void) const noexcept {
+	// 1. Fast fail: If there are ANY pawns, rooks, or queens, it's not insufficient material.
+	if (pieces[PT_PAWN] | pieces[PT_PAWN + 6] | pieces[PT_ROOK] | pieces[PT_ROOK + 6] |
+	    pieces[PT_QUEEN] | pieces[PT_QUEEN + 6]) {
+		return false;
+	}
+
+	// 2. Count the remaining minor pieces
+	int wKnights = std::popcount(pieces[PT_KNIGHT]);
+	int bKnights = std::popcount(pieces[PT_KNIGHT + 6]);
+	int wBishops = std::popcount(pieces[PT_BISHOP]);
+	int bBishops = std::popcount(pieces[PT_BISHOP + 6]);
+
+	int totalMinors = wKnights + bKnights + wBishops + bBishops;
+
+	// Scenarios 1 & 2: King vs King, or King + 1 Minor vs King
+	if (totalMinors <= 1) {
+		return true;
+	}
+
+	// Scenario 3: King + Bishop vs King + Bishop (Bishops must be on the same square color)
+	if (totalMinors == 2 && wBishops == 1 && bBishops == 1) {
+		constexpr uint64_t LIGHT_SQUARES = 0x55AA55AA55AA55AAULL;
+
+		bool wLight = (pieces[PT_BISHOP] & LIGHT_SQUARES) != 0;
+		bool bLight = (pieces[PT_BISHOP + 6] & LIGHT_SQUARES) != 0;
+
+		return wLight == bLight;
+	}
+
+	return false;
+}
+
+bool Position::isRepetition(void) const noexcept {
+	int searchLimit = ply - rule50;
+	if (searchLimit < 0) {
+		searchLimit = 0;
+	}
+
+	for (int i = ply - 2; i >= searchLimit; i -= 2) {
+		if (undoStack[i].hash == this->hash) {
+			return true;
+		}
+	}
+
+	int remainingHalfMoves = rule50 - ply;
+
+	if (remainingHalfMoves > 0 && !hashHistory.empty()) {
+		int historyLimit = static_cast<int>(hashHistory.size()) - 1 - remainingHalfMoves;
+		if (historyLimit < 0) {
+			historyLimit = 0;
+		}
+
+		// hashHistory.back() is the search root. We step back by 2 from the root.
+		// Therefore we start checking at hashHistory.size() - 3
+		for (int i = static_cast<int>(hashHistory.size()) - 3; i >= historyLimit; i -= 2) {
+			if (hashHistory[i] == this->hash) {
+				return true;
+			}
+		}
+	}
+
+	return false;
+}
+
 uint64_t Position::computeHash(void) {
 	uint64_t h = 0;
 	// pieces
@@ -588,3 +662,5 @@ uint64_t Position::computeHash(void) {
 
 	return h;
 }
+
+void Position::saveHash(void) noexcept { hashHistory.emplace_back(hash); }

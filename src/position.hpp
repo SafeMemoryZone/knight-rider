@@ -30,6 +30,12 @@ struct Position {
 	void undoMove(void);
 	void resetPly(void);
 
+	// draw detection
+	void saveHash(void) noexcept;
+	bool is50MoveDraw(void) const noexcept;
+	bool isInsufficientMaterial(void) const noexcept;
+	bool isRepetition(void) const noexcept;
+
 	// board state
 	Bitboard occForColor[2];
 	Bitboard pieces[12];
@@ -42,6 +48,11 @@ struct Position {
 	uint64_t hash;
 
 	int ply = 0;
+
+	// Since we reset ply at the start of each search, we loose information about previous zobrist
+	// hashes that we need for three-fold repetition detection. All other hashs are stored in the
+	// undo stack
+	std::vector<uint64_t> hashHistory;
 
    private:
 	UndoInfo undoStack[MAX_PLY];
