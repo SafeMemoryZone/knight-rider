@@ -229,6 +229,7 @@ void UciEngine::handlePositionCmd(void) {
 			for (const Move move : legalMoves) {
 				if (move.toLan() == lan) {
 					pos.makeMove(move);
+					pos.saveHash();
 					applied = true;
 					break;
 				}
