@@ -230,6 +230,8 @@ void UciEngine::handlePositionCmd(void) {
 				if (move.toLan() == lan) {
 					pos.makeMove(move);
 					pos.saveHash();
+					pos.resetPly();  // the engine needs to handle more than the MAX_PLY limit and
+					                 // since we don't need the undo info, we can safely reset ply
 					applied = true;
 					break;
 				}

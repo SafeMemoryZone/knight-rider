@@ -364,6 +364,10 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 Score Engine::quiescence(Score alpha, Score beta, bool &searchCancelledOut) {
 	searchCancelledOut = false;
 
+	if (searchPos.ply >= MAX_PLY - 1) {
+		return eval(searchPos);
+	}
+
 	if (nodesSearched >= maxNodes || searchStopRequested) {
 		searchCancelledOut = true;
 		return alpha;
