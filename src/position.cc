@@ -606,61 +606,84 @@ bool Position::isInsufficientMaterial(void) const noexcept {
 }
 
 bool Position::isRepetition(void) const noexcept {
-	int searchLimit = ply - rule50;
-	if (searchLimit < 0) {
-		searchLimit = 0;
-	}
+    // Repetition candidates must be an even number of half-moves away, because
+    // only then is the same side to move.
+    //
+    // undoStack[i] stores the position at search ply i, while the current position
+    // itself is not stored there. Therefore the first possible repetition inside
+    // the search is at ply - 2, not ply - 1. The scan is also limited by rule50 so
+    // it never crosses the most recent irreversible move.
+    //
+    // hashHistory contains the played-game positions up to and including the search
+    // root, i.e. hashHistory.back() is the root. After scanning undoStack, only the
+    // part of the reversible sequence before the root remains to be checked.
+    //
+    // At an even search ply, the current position has the same side to move as the
+    // root. The root is already represented by undoStack[0] once the search is at
+    // least two plies deep, and at ply 0 comparing it with itself would be wrong,
+    // so the history scan begins two positions before the root: size() - 3.
+    //
+    // At an odd search ply, the side to move is opposite to the root, so the first
+    // compatible historical position is one position before the root: size() - 2.
+    //
+    // These two cases are combined as:
+    //     size() - 3 + (ply & 1)
 
-	for (int i = ply - 2; i >= searchLimit; i -= 2) {
-		if (undoStack[i].hash == this->hash) {
-			return true;
-		}
-	}
+    int searchLimit = ply - rule50;
+    if (searchLimit < 0) {
+        searchLimit = 0;
+    }
 
-	int remainingHalfMoves = rule50 - ply;
+    for (int i = ply - 2; i >= searchLimit; i -= 2) {
+        if (undoStack[i].hash == this->hash) {
+            return true;
+        }
+    }
 
-	if (remainingHalfMoves > 0 && !hashHistory.empty()) {
-		int historyLimit = static_cast<int>(hashHistory.size()) - 1 - remainingHalfMoves;
-		if (historyLimit < 0) {
-			historyLimit = 0;
-		}
+    int remainingHalfMoves = rule50 - ply;
 
-		// hashHistory.back() is the search root. We step back by 2 from the root.
-		// Therefore we start checking at hashHistory.size() - 3
-		for (int i = static_cast<int>(hashHistory.size()) - 3; i >= historyLimit; i -= 2) {
-			if (hashHistory[i] == this->hash) {
-				return true;
-			}
-		}
-	}
+    if (remainingHalfMoves > 0 && !hashHistory.empty()) {
+        int historyLimit = static_cast<int>(hashHistory.size()) - 1 - remainingHalfMoves;
+        if (historyLimit < 0) {
+            historyLimit = 0;
+        }
 
-	return false;
+        const int start = static_cast<int>(hashHistory.size()) - 3 + (ply & 1);
+
+        for (int i = start; i >= historyLimit; i -= 2) {
+            if (hashHistory[i] == this->hash) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 uint64_t Position::computeHash(void) {
-	uint64_t h = 0;
-	// pieces
-	for (int p = 0; p < 12; p++) {
-		uint64_t b = pieces[p];
-		while (b) {
-			int sq = std::countr_zero(b);
-			b &= b - 1;
-			h ^= Z_PSQ[p][sq];
-		}
-	}
+    uint64_t h = 0;
+    // pieces
+    for (int p = 0; p < 12; p++) {
+        uint64_t b = pieces[p];
+        while (b) {
+            int sq = std::countr_zero(b);
+            b &= b - 1;
+            h ^= Z_PSQ[p][sq];
+        }
+    }
 
-	h ^= Z_CASTLING[castlingRights];
+    h ^= Z_CASTLING[castlingRights];
 
-	if (epSquare) {
-		int file = std::countr_zero(epSquare) & 7;
-		h ^= Z_EP_FILE[file];
-	}
+    if (epSquare) {
+        int file = std::countr_zero(epSquare) & 7;
+        h ^= Z_EP_FILE[file];
+    }
 
-	if (usColor == BLACK) {
-		h ^= Z_BLACK_TO_MOVE;
-	}
+    if (usColor == BLACK) {
+        h ^= Z_BLACK_TO_MOVE;
+    }
 
-	return h;
+    return h;
 }
 
 void Position::saveHash(void) noexcept { hashHistory.emplace_back(hash); }
