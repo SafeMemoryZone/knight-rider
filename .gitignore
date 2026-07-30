@@ -39,3 +39,5 @@ out/
 .DS_STORE
 .cache/
 compile_commands.json
+__pycache__/
+*.pyc
