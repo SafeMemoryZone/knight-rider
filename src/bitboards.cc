@@ -173,7 +173,7 @@ static void initBishopAttackMask(void) {
 
 		for (Bitboard blockerPattern = BISHOP_BLOCKER_MASK[sq];;
 		     blockerPattern = (blockerPattern - 1) & BISHOP_BLOCKER_MASK[sq]) {
-			Bitboard bishopAttacksBb = 0L;
+			Bitboard bishopAttacksBb = 0ULL;
 
 			for (int rank = sqRank - 1, file = sqFile + 1; rank >= 0 && file <= 7; rank--, file++) {
 				Bitboard sqBb = 1ULL << (rank * 8 + file);
@@ -244,19 +244,19 @@ static void initBishopXRayMask(void) {
 		int sqRank = sq >> 3;
 		int sqFile = sq & 7;
 
-		Bitboard xRays = 0L;
+		Bitboard xRays = 0ULL;
 
 		for (int rank = sqRank - 1, file = sqFile + 1; rank >= 0 && file <= 7; rank--, file++) {
-			xRays |= 1L << (rank * 8 + file);
+			xRays |= 1ULL << (rank * 8 + file);
 		}
 		for (int rank = sqRank - 1, file = sqFile - 1; rank >= 0 && file >= 0; rank--, file--) {
-			xRays |= 1L << (rank * 8 + file);
+			xRays |= 1ULL << (rank * 8 + file);
 		}
 		for (int rank = sqRank + 1, file = sqFile + 1; rank <= 7 && file <= 7; rank++, file++) {
-			xRays |= 1L << (rank * 8 + file);
+			xRays |= 1ULL << (rank * 8 + file);
 		}
 		for (int rank = sqRank + 1, file = sqFile - 1; rank <= 7 && file >= 0; rank++, file--) {
-			xRays |= 1L << (rank * 8 + file);
+			xRays |= 1ULL << (rank * 8 + file);
 		}
 
 		BISHOP_XRAY_MASK[sq] = xRays;
@@ -275,7 +275,7 @@ static void initBetweenMask(void) {
 		int fromSqFile = fromSq & 7;
 
 		for (int toSq = 0; toSq < 64; toSq++) {
-			Bitboard toSqBb = 1L << toSq;
+			Bitboard toSqBb = 1ULL << toSq;
 			int toSqRank = toSq >> 3;
 			int toSqFile = toSq & 7;
 
@@ -294,7 +294,7 @@ static void initBetweenMask(void) {
 					break;
 				}
 
-				Bitboard sqBb = 1L << (rank * 8 + file);
+				Bitboard sqBb = 1ULL << (rank * 8 + file);
 				betweenMask |= sqBb;
 			}
 
@@ -309,7 +309,7 @@ static void initLineMask(void) {
 		int sq1File = sq1 & 7;
 
 		for (int sq2 = 0; sq2 < 64; sq2++) {
-			Bitboard sq2BB = 1L << sq2;
+			Bitboard sq2BB = 1ULL << sq2;
 			int sq2Rank = sq2 >> 3;
 			int sq2File = sq2 & 7;
 
@@ -320,17 +320,17 @@ static void initLineMask(void) {
 			int dRank = signum(sq2Rank - sq1Rank);
 			int dFile = signum(sq2File - sq1File);
 
-			Bitboard ray = 0L;
+			Bitboard ray = 0ULL;
 
 			for (int rank = sq1Rank, file = sq1File;
 			     rank >= 0 && rank <= 7 && file >= 0 && file <= 7; rank += dRank, file += dFile) {
-				Bitboard sqBB = 1L << (rank * 8 + file);
+				Bitboard sqBB = 1ULL << (rank * 8 + file);
 				ray |= sqBB;
 			}
 
 			for (int rank = sq1Rank, file = sq1File;
 			     rank >= 0 && rank <= 7 && file >= 0 && file <= 7; rank -= dRank, file -= dFile) {
-				Bitboard sqBB = 1L << (rank * 8 + file);
+				Bitboard sqBB = 1ULL << (rank * 8 + file);
 				ray |= sqBB;
 			}
 
