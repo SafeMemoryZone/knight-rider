@@ -264,6 +264,11 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	const uint64_t key = searchPos.hash;
 	const Score originalAlpha = alpha;
 
+	if (searchPos.is50MoveDraw() || searchPos.isInsufficientMaterial() ||
+	    searchPos.isRepetition()) {
+		return 0;
+	}
+
 	Move ttMove;
 	TTEntry entry;
 	if (searchTt->probe(key, entry)) {
@@ -277,11 +282,6 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 				return ttScore;
 			}
 		}
-	}
-
-	if (searchPos.is50MoveDraw() || searchPos.isInsufficientMaterial() ||
-	    searchPos.isRepetition()) {
-		return 0;
 	}
 
 	// quick bailout for checkmates and draws
