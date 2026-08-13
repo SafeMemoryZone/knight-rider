@@ -9,12 +9,12 @@ class MoveGenerator {
 	MoveGenerator(void) = default;
 	explicit MoveGenerator(Position* positionPtr);
 
-	MoveList generateLegalMoves(bool onlyCaptures = false) const;
+	MoveList generateLegalMoves(bool onlyCaptures = false);
 
    private:
 	// color-specific templates
 	template <int UsColor, bool OnlyCaptures>
-	MoveList generateLegalMovesT(void) const;
+	MoveList generateLegalMovesT(void);
 	template <int UsColor>
 	Bitboard computeAttackMaskT(void) const;
 	template <int UsColor>
@@ -26,6 +26,14 @@ class MoveGenerator {
 
 	Position* position = nullptr;
 	Bitboard* P = nullptr;  // alias for position->pieces
+
+    // re-computed by generateLegalMovesT() everytime
+    Bitboard usOcc = 0ULL;
+    Bitboard oppOcc = 0ULL;
+    Bitboard occ = 0ULL;
+    Bitboard oppRooksQueens = 0ULL;
+    Bitboard oppBishopsQueens = 0ULL;
+    int kingSq = 0ULL;
 };
 
 #endif  // MOVEGEN_HPP
