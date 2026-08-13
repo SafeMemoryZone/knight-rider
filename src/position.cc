@@ -651,7 +651,7 @@ bool Position::isRepetition(void) const noexcept {
         const int start = static_cast<int>(hashHistory.size()) - 3 + (ply & 1);
 
         for (int i = start; i >= historyLimit; i -= 2) {
-            if (hashHistory[i] == this->hash) {
+            if (hashHistory[static_cast<unsigned int>(i)] == this->hash) {
                 return true;
             }
         }
