@@ -26,6 +26,8 @@ def parse_args(argv):
     p.add_argument("--pgnout", default=str(WORK / "games.pgn"))
     p.add_argument("--fastchess", default="fastchess")
     p.add_argument("--jobs", type=int, default=os.cpu_count())
+    p.add_argument("--elo0", type=int, default=0)
+    p.add_argument("--elo1", type=int, default=10)
     return p.parse_args(argv)
 
 
@@ -73,7 +75,7 @@ def main(argv):
         "-srand", str(args.srand),
         "-games", str(args.games),
         "-rounds", str(args.rounds),
-        "-sprt", "elo0=0", "elo1=10", "alpha=0.05", "beta=0.05", "model=normalized",
+        "-sprt", f"elo0={args.elo0}", f"elo1={args.elo1}", "alpha=0.05", "beta=0.05", "model=normalized",
         "-concurrency", str(args.concurrency),
         "-pgnout", f"file={Path(args.pgnout).resolve()}", "notation=san", "append=false",
         "-strict",
