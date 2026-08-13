@@ -23,7 +23,7 @@ static size_t perftT(int depth) {
 		size_t count = perftT<false>(depth - 1);
 
 		if constexpr (PrintPerftLine) {
-			std::cout << move.toLan() << ": " << count << '\n';
+			printSafe(move.toLan(), ": ", count);
 		}
 
 		nodes += count;
