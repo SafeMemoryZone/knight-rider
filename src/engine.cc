@@ -123,10 +123,8 @@ static void pickNext(MoveList &moves, int scores[], size_t i) {
 
 void Engine::startSearch(const Position &pos, TranspositionTable *tt, const GoLimits &limits,
                          std::chrono::time_point<std::chrono::steady_clock> commandReceiveTime) {
-	// join any previous search thread before starting a new one
-	if (searchThread.joinable()) {
-		searchThread.join();
-	}
+	// stop any previous search thread before starting a new one
+    stopSearch();
 
 	bestMove = Move();  // set bestMove to NULL
 	searchPos = pos;
