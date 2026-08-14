@@ -26,7 +26,7 @@ static inline void addMovesToList(MoveList &moveList, Bitboard from, Bitboard al
 MoveGenerator::MoveGenerator(Position *positionPtr)
     : position(positionPtr), P(positionPtr->pieces) {}
 
-MoveList MoveGenerator::generateLegalMoves(bool onlyCaptures) const {
+MoveList MoveGenerator::generateLegalMoves(bool onlyCaptures) {
 	if (position->usColor == WHITE) {
 		return onlyCaptures ? generateLegalMovesT<WHITE, true>()
 		                    : generateLegalMovesT<WHITE, false>();
@@ -37,15 +37,8 @@ MoveList MoveGenerator::generateLegalMoves(bool onlyCaptures) const {
 	}
 }
 
-static Bitboard usOcc;
-static Bitboard oppOcc;
-static Bitboard occ;
-static Bitboard oppRooksQueens;
-static Bitboard oppBishopsQueens;
-static int kingSq;
-
 template <int UsColor, bool OnlyCaptures>
-MoveList MoveGenerator::generateLegalMovesT(void) const {
+MoveList MoveGenerator::generateLegalMovesT(void) {
 	constexpr int OppColor = UsColor ^ 1;
 
 	MoveList moveList;
@@ -77,11 +70,11 @@ MoveList MoveGenerator::generateLegalMovesT(void) const {
 	                                    : 0ULL;
 	const Bitboard checkEvasionMask = isInCheck ? checkerMask | checkBlockMask : ~0ULL;
 	const Bitboard pinMask = computePinMaskT<UsColor>();
-	const Bitboard capturableSquares = [] {
+	const Bitboard capturableSquares = [this] {
 		if constexpr (OnlyCaptures)
-			return oppOcc;  // only enemy squares
+			return this->oppOcc;  // only enemy squares
 		else
-			return ~usOcc;  // normal: empty or enemy
+			return ~this->usOcc;  // normal: empty or enemy
 	}();
 
 	// move generation start

@@ -9,6 +9,7 @@
 
 #include "bitboards.hpp"
 #include "engine.hpp"
+#include "misc.hpp"
 #include "movelist.hpp"
 #include "perft.hpp"
 #include "zobrist.hpp"
@@ -380,7 +381,7 @@ void UciEngine::handleGoCmd(void) {
 		auto endTime = std::chrono::high_resolution_clock::now();
 		std::chrono::duration<double> elapsedTime = endTime - startTime;
 
-		std::cout << "\nNodes searched: " << nodes << " in " << elapsedTime << '\n' << std::endl;
+        printSafe("\nNodes searched: ", nodes, " in ", elapsedTime, '\n');
 	}
 	else {
 		engine.startSearch(pos, &tt, limits, recvTP);
@@ -390,6 +391,8 @@ void UciEngine::handleGoCmd(void) {
 void UciEngine::handleStopCmd(void) { engine.stopSearch(); }
 
 void UciEngine::handleSetoptionCmd(void) {
+    // FIX: resizing table while ongoing search causes UB
+
 	// setoption name <id> [value <x>]
 	tokenPos = 1;
 	if (tokenPos >= lowerTokens.size() || lowerTokens[tokenPos] != "name") {

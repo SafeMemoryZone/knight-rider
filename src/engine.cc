@@ -123,10 +123,8 @@ static void pickNext(MoveList &moves, int scores[], size_t i) {
 
 void Engine::startSearch(const Position &pos, TranspositionTable *tt, const GoLimits &limits,
                          std::chrono::time_point<std::chrono::steady_clock> commandReceiveTime) {
-	// join any previous search thread before starting a new one
-	if (searchThread.joinable()) {
-		searchThread.join();
-	}
+	// stop any previous search thread before starting a new one
+    stopSearch();
 
 	bestMove = Move();  // set bestMove to NULL
 	searchPos = pos;
@@ -264,6 +262,7 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	const uint64_t key = searchPos.hash;
 	const Score originalAlpha = alpha;
 
+    // FIX: a mate delivered on the move that reaches the 100th half-move should be a win
 	if (searchPos.is50MoveDraw() || searchPos.isInsufficientMaterial() ||
 	    searchPos.isRepetition()) {
 		return 0;
