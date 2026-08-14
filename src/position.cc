@@ -429,6 +429,7 @@ void Position::makeMoveT(Move move) {
 
 	// update ep square
 	// white double-push
+    // FIX: epSquare is set on every double push even when no enemy pawn can capture so positions that are identical for repetition purposes hash differently
 	if (movingPt == PT_PAWN && (from & RANK_2) && (to & RANK_4)) {
 		epSquare = to >> 8;
 	}

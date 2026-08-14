@@ -262,6 +262,7 @@ Score Engine::negamax(int depth, Score alpha, Score beta, bool &searchCancelledO
 	const uint64_t key = searchPos.hash;
 	const Score originalAlpha = alpha;
 
+    // FIX: a mate delivered on the move that reaches the 100th half-move should be a win
 	if (searchPos.is50MoveDraw() || searchPos.isInsufficientMaterial() ||
 	    searchPos.isRepetition()) {
 		return 0;

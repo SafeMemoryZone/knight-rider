@@ -391,6 +391,8 @@ void UciEngine::handleGoCmd(void) {
 void UciEngine::handleStopCmd(void) { engine.stopSearch(); }
 
 void UciEngine::handleSetoptionCmd(void) {
+    // FIX: resizing table while ongoing search causes UB
+
 	// setoption name <id> [value <x>]
 	tokenPos = 1;
 	if (tokenPos >= lowerTokens.size() || lowerTokens[tokenPos] != "name") {
