@@ -3,9 +3,10 @@
 import argparse
 import sys
 
+from correctness.runner import run as run_correctness
 from strength.runner import run as run_strength
 
-RUNNERS = {"strength": run_strength}
+RUNNERS = {"correctness": run_correctness, "strength": run_strength}
 
 def main():
     parser = argparse.ArgumentParser(description="Knightrider test orchestrator")
