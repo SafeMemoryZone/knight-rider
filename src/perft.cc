@@ -1,7 +1,5 @@
 #include "perft.hpp"
 
-#include <iostream>
-
 #include "movegen.hpp"
 #include "movelist.hpp"
 
